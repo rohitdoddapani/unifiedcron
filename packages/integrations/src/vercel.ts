@@ -8,6 +8,11 @@ interface VercelConfig {
   functions?: Record<string, VercelFunction>;
 }
 
+interface GitHubFileContent {
+  content: string;
+  encoding: string;
+}
+
 /**
  * Parses Vercel JSON configuration to extract scheduled functions
  */
@@ -72,7 +77,7 @@ export async function fetchVercelConfigFromGithub(
       throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
     }
 
-    const file = await response.json();
+    const file = await response.json() as GitHubFileContent;
     
     // Decode base64 content
     const jsonContent = Buffer.from(file.content, 'base64').toString('utf8');

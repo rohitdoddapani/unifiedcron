@@ -10,6 +10,11 @@ interface NetlifyConfig {
   functions?: NetlifyFunction | NetlifyFunction[];
 }
 
+interface GitHubFileContent {
+  content: string;
+  encoding: string;
+}
+
 /**
  * Parses Netlify TOML configuration to extract scheduled functions
  */
@@ -72,7 +77,7 @@ export async function fetchNetlifyConfigFromGithub(
       throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
     }
 
-    const file = await response.json();
+    const file = await response.json() as GitHubFileContent;
     
     // Decode base64 content
     const tomlContent = Buffer.from(file.content, 'base64').toString('utf8');

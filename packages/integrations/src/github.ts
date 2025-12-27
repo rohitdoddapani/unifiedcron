@@ -13,6 +13,13 @@ interface GitHubWorkflow {
   };
 }
 
+interface GitHubFile {
+  name: string;
+  path: string;
+  type: string;
+  download_url: string;
+}
+
 /**
  * Parses GitHub workflow YAML content to extract cron jobs
  */
@@ -66,7 +73,7 @@ export async function fetchGithubWorkflows(
       throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
     }
 
-    const files = await response.json();
+    const files = await response.json() as GitHubFile[];
     const jobs: ParsedJob[] = [];
 
     for (const file of files) {

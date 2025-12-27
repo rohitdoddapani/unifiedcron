@@ -83,7 +83,7 @@ export async function fetchN8nWorkflows(
         });
 
         if (response.ok) {
-          workflows = await response.json();
+          workflows = await response.json() as N8nWorkflow[];
           break;
         } else if (response.status === 404) {
           // Try next endpoint
