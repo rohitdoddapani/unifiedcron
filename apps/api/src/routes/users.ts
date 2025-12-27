@@ -1,7 +1,7 @@
-import { Router } from 'express';
+import { Router, IRouter } from 'express';
 import { getDefaultUserId } from '../utils/user';
 
-const router = Router();
+const router: IRouter = Router();
 
 // Get or create default user (for development/MVP)
 router.get('/default', async (req, res, next) => {

@@ -21,7 +21,7 @@ export class ConnectionService {
 
     // Decrypt config for each connection
     const connections = await Promise.all(
-      result.rows.map(async (row) => ({
+      result.rows.map(async (row: { config: { encrypted?: string } } & Record<string, unknown>) => ({
         ...row,
         config: await this.decryptConfig(row.config.encrypted || row.config)
       }))

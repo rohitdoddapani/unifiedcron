@@ -1,9 +1,9 @@
-import { Router } from 'express';
+import { Router, IRouter } from 'express';
 import { query } from '@unifiedcron/database';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-const router = Router();
+const router: IRouter = Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || process.env.ENCRYPTION_KEY || 'change-me-in-production';
 

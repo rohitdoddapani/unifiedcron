@@ -1,8 +1,8 @@
-import { Router } from 'express';
+import { Router, IRouter } from 'express';
 import { ConnectionService } from '../services/ConnectionService';
 import { Platform, ConnectionConfig } from '@unifiedcron/shared';
 
-const router = Router();
+const router: IRouter = Router();
 
 // Lazy initialization - create service instance when first needed
 let connectionService: ConnectionService | null = null;

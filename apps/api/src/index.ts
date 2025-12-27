@@ -14,7 +14,7 @@ dotenv.config({ path: path.join(rootPath, '.env') }); // Fallback
 dotenv.config(); // Also try local .env file
 
 // Now import everything else AFTER environment is loaded
-import express from 'express';
+import express, { Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { closePool } from '@unifiedcron/database';
@@ -40,7 +40,7 @@ if (!process.env.ENCRYPTION_KEY) {
   process.exit(1);
 }
 
-const app = express();
+const app: Application = express();
 const PORT = process.env.API_PORT || 3001;
 
 // Middleware

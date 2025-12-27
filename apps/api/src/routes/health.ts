@@ -1,7 +1,7 @@
-import { Router } from 'express';
+import { Router, IRouter } from 'express';
 import { query } from '@unifiedcron/database';
 
-const router = Router();
+const router: IRouter = Router();
 
 // Basic health check
 router.get('/', (req, res) => {

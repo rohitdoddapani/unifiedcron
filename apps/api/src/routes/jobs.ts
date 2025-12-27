@@ -1,7 +1,7 @@
-import { Router } from 'express';
+import { Router, IRouter } from 'express';
 import { JobService } from '../services/JobService';
 
-const router = Router();
+const router: IRouter = Router();
 const jobService = new JobService();
 
 // Get all jobs for a user

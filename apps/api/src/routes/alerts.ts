@@ -1,7 +1,7 @@
-import { Router } from 'express';
+import { Router, IRouter } from 'express';
 import { AlertService } from '../services/AlertService';
 
-const router = Router();
+const router: IRouter = Router();
 const alertService = new AlertService();
 const DISABLE_MONITORING = process.env.DISABLE_MONITORING === 'true' || process.env.NODE_ENV === 'development';
 
