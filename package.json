@@ -1,0 +1,32 @@
+{
+  "name": "unifiedcron",
+  "version": "1.0.0",
+  "description": "A developer tool that centralizes cron jobs from many platforms into one dashboard",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "apps/api",
+    "apps/worker",
+    "apps/landing"
+  ],
+  "scripts": {
+    "dev": "concurrently \"pnpm dev:web\" \"pnpm dev:api\"",
+    "dev:web": "pnpm --filter web dev",
+    "dev:api": "pnpm --filter api dev",
+    "dev:worker": "pnpm --filter worker dev",
+    "dev:landing": "pnpm --filter @unifiedcron/landing dev",
+    "build": "pnpm --filter web build && pnpm --filter api build",
+    "start": "pnpm --filter api start",
+    "test": "pnpm --filter web test && pnpm --filter api test",
+    "lint": "pnpm --filter web lint && pnpm --filter api lint",
+    "type-check": "pnpm --filter web type-check && pnpm --filter api type-check"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@unifiedcron/shared",
+  "version": "1.0.0",
+  "description": "Shared types and utilities for UnifiedCron",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.20",
+    "typescript": "^5.3.3"
+  }
+}
