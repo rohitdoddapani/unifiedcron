@@ -7,18 +7,18 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 # Set working directory
 WORKDIR /app
 
-# Copy workspace files
+# Copy workspace and package files
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY apps/landing/package.json ./apps/landing/package.json
 
-# Dependencies stage
+# Dependencies stage - install all dependencies
 FROM base AS deps
-COPY apps/landing/package.json ./apps/landing/
-RUN pnpm install --frozen-lockfile --filter @unifiedcron/landing
+RUN pnpm install --frozen-lockfile
 
 # Build stage
-FROM base AS build
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/landing/node_modules ./apps/landing/node_modules
+FROM deps AS build
+
+# Copy source files after dependencies are installed
 COPY apps/landing ./apps/landing
 
 # Build Next.js app
@@ -47,4 +47,3 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
 
 # Start the server
 CMD ["node", "apps/landing/server.js"]
-
