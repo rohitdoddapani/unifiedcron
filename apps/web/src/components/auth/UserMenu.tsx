@@ -1,6 +1,7 @@
 'use client';
 
 import { signOut, useSession } from 'next-auth/react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { LogOut, User } from 'lucide-react';
 
@@ -13,9 +14,11 @@ export function UserMenu() {
 
   if (!session) {
     return (
-      <Button href="/auth/signin" variant="outline" size="sm">
-        Sign In
-      </Button>
+      <Link href="/auth/signin">
+        <Button variant="outline" size="sm">
+          Sign In
+        </Button>
+      </Link>
     );
   }
 
