@@ -62,7 +62,7 @@ function JobsPageContent() {
       if (!id) return;
       
       const response = await api.getConnections(id);
-      if (response.success && response.data) {
+      if (response.success && response.data && Array.isArray(response.data)) {
         setConnections(response.data);
       }
     } catch (error) {
@@ -76,9 +76,9 @@ function JobsPageContent() {
       if (!id) return;
       
       const response = await api.getJobs(id);
-      if (response.success && response.data) {
+      if (response.success && response.data && Array.isArray(response.data)) {
         setJobs(response.data);
-      } else {
+      } else if (!response.success) {
         setError(response.error || 'Failed to load jobs');
       }
     } catch (error) {
@@ -98,7 +98,7 @@ function JobsPageContent() {
       
       const response = await api.refreshJobs(connectionId, userId);
       if (response.success && response.data) {
-        const { added, updated, errors } = response.data;
+        const { added, updated, errors } = response.data as { added: number; updated: number; errors: string[] };
         const message = `✅ Discovered ${added} new job(s) and updated ${updated} existing job(s)`;
         alert(errors.length > 0 ? `${message}\n\nErrors: ${errors.join(', ')}` : message);
         
