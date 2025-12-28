@@ -31,7 +31,7 @@ function DashboardContent() {
     activeAlerts: 0,
     recentFailures: 0
   });
-  const [connections, setConnections] = useState([]);
+  const [connections, setConnections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
