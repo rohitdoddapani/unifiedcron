@@ -148,11 +148,11 @@ function ConnectionsPageContent() {
     try {
       const response = await api.testConnection(connectionId, currentUserId);
       if (response.success) {
-        const result = response.data;
-        if (result.success) {
+        const result = response.data as { success: boolean; message: string };
+        if (result?.success) {
           alert('✅ Connection test successful!');
         } else {
-          alert(`❌ Connection test failed: ${result.message}`);
+          alert(`❌ Connection test failed: ${result?.message || 'Unknown error'}`);
         }
       } else {
         alert(`❌ Test failed: ${response.error}`);
@@ -181,7 +181,7 @@ function ConnectionsPageContent() {
       
       const response = await api.refreshJobs(connectionId, currentUserId);
       if (response.success && response.data) {
-        const { added, updated, errors } = response.data;
+        const { added, updated, errors } = response.data as { added: number; updated: number; errors: string[] };
         const message = `✅ Discovered ${added} new job(s) and updated ${updated} existing job(s)`;
         alert(errors.length > 0 ? `${message}\n\nErrors: ${errors.join(', ')}` : message);
         
