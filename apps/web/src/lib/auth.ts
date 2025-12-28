@@ -1,5 +1,5 @@
-import { NextAuthOptions } from 'next-auth';
-import { Adapter } from 'next-auth/adapters';
+import type { NextAuthConfig } from 'next-auth';
+import type { Adapter } from 'next-auth/adapters';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 import GitHubProvider from 'next-auth/providers/github';
@@ -165,7 +165,7 @@ export const authAdapter: Adapter = {
   },
 };
 
-export const authOptions: NextAuthOptions = {
+export const authOptions: NextAuthConfig = {
   // Note: When using CredentialsProvider, we use JWT strategy instead of database adapter
   // The adapter is still used for OAuth providers (Google, GitHub)
   // adapter: authAdapter, // Commented out because CredentialsProvider requires JWT
