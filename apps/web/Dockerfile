@@ -66,5 +66,5 @@ ENV HOSTNAME="0.0.0.0"
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start the server
-CMD ["node", "server.js"]
+# Start the server (server.js is in apps/web/ due to monorepo structure)
+CMD ["node", "apps/web/server.js"]
