@@ -86,8 +86,10 @@ function ConnectionsPageContent() {
         throw new Error('User ID not available');
       }
       const response = await api.getConnections(id);
-      if (response.success && response.data) {
+      if (response.success && response.data && Array.isArray(response.data)) {
         setConnections(response.data);
+      } else if (response.success) {
+        setConnections([]);
       } else {
         console.error('Failed to fetch connections:', response.error);
         setError(response.error || 'Failed to load connections.');
