@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.8.4",
+    "@unifiedcron/database": "workspace:*",
     "@unifiedcron/shared": "workspace:*",
     "axios": "^1.6.2",
     "bcryptjs": "^2.4.3",
