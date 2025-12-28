@@ -55,10 +55,11 @@ async function getDefaultUserIdHelper(): Promise<string> {
 
   try {
     const response = await apiRequest<{ userId: string; email: string; name: string }>('/api/users/default');
-    // The apiRequest spreads the API response, so userId is directly on response, not response.data
-    if (response.success && response.userId) {
-      cachedUserId = response.userId;
-      return response.userId;
+    // Access userId from response.data (typed) or directly from response (spread at runtime)
+    const data = response.data || (response as any);
+    if (response.success && data.userId) {
+      cachedUserId = data.userId;
+      return data.userId;
     }
     throw new Error(response.error || 'Failed to get default user ID');
   } catch (error) {
