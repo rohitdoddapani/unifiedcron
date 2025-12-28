@@ -10,6 +10,7 @@ WORKDIR /app
 # Copy workspace and package files
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY packages/shared/package.json ./packages/shared/package.json
+COPY packages/database/package.json ./packages/database/package.json
 COPY apps/web/package.json ./apps/web/package.json
 
 # Dependencies stage - install all dependencies
@@ -26,10 +27,16 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 # Copy source files after dependencies are installed
 COPY packages/shared/src ./packages/shared/src
 COPY packages/shared/tsconfig.json ./packages/shared/tsconfig.json
+COPY packages/database/src ./packages/database/src
+COPY packages/database/tsconfig.json ./packages/database/tsconfig.json
 COPY apps/web ./apps/web
 
 # Build shared package
 WORKDIR /app/packages/shared
+RUN pnpm build
+
+# Build database package
+WORKDIR /app/packages/database
 RUN pnpm build
 
 # Build Next.js app
