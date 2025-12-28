@@ -47,7 +47,7 @@ function DashboardContent() {
       
       // Fetch real connections
       const connectionsResponse = await api.getConnections(userId);
-      if (connectionsResponse.success && connectionsResponse.data) {
+      if (connectionsResponse.success && connectionsResponse.data && Array.isArray(connectionsResponse.data)) {
         const conns = connectionsResponse.data;
         setConnections(conns);
         setStats({
