@@ -41,6 +41,8 @@ RUN pnpm build
 
 # Build Next.js app
 WORKDIR /app/apps/web
+# Create public folder if it doesn't exist
+RUN mkdir -p public
 RUN pnpm build
 
 # Production stage
