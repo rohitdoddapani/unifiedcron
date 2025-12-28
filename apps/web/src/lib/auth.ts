@@ -178,7 +178,10 @@ export const authOptions: NextAuthConfig = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
+        const email = credentials?.email as string | undefined;
+        const password = credentials?.password as string | undefined;
+        
+        if (!email || !password) {
           // Return null instead of throwing to prevent redirect to error page
           // The error will be caught by signIn callback
           return null;
@@ -186,7 +189,7 @@ export const authOptions: NextAuthConfig = {
 
         try {
           // Find user by email
-          const userResult = await query('SELECT * FROM users WHERE email = $1', [credentials.email]);
+          const userResult = await query('SELECT * FROM users WHERE email = $1', [email]);
           if (userResult.rows.length === 0) {
             return null;
           }
@@ -199,7 +202,7 @@ export const authOptions: NextAuthConfig = {
           }
 
           // Verify password
-          const isValid = await bcrypt.compare(credentials.password, user.passwordHash);
+          const isValid = await bcrypt.compare(password, user.passwordHash);
           if (!isValid) {
             return null;
           }
