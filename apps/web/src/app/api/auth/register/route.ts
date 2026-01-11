@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 
 // Proxy the registration request to the backend API
-// The backend API properly handles database connections with correct env vars
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+// Use internal URL for server-side calls within Docker network
+// INTERNAL_API_URL should be set to http://unifiedcron-api:3001 in production
+const API_URL = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export async function POST(request: Request) {
   try {
