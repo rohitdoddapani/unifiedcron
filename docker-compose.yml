@@ -9,6 +9,8 @@ services:
     volumes:
       - ./db-data:/var/lib/postgresql/data
       - ./packages/database/src/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     networks:
       - unifiedcron_internal
     restart: unless-stopped
