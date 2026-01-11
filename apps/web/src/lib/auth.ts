@@ -166,6 +166,8 @@ export const authAdapter: Adapter = {
 };
 
 export const authOptions: NextAuthConfig = {
+  // Trust the host in production (required when behind a reverse proxy)
+  trustHost: true,
   // Note: When using CredentialsProvider, we use JWT strategy instead of database adapter
   // The adapter is still used for OAuth providers (Google, GitHub)
   // adapter: authAdapter, // Commented out because CredentialsProvider requires JWT
