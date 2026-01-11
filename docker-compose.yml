@@ -1,4 +1,23 @@
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: unifiedcron-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-unifiedcron}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-unifiedcron}
+      POSTGRES_DB: ${POSTGRES_DB:-unifiedcron}
+    volumes:
+      - unifiedcron_postgres_data:/var/lib/postgresql/data
+      - ./packages/database/src/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    networks:
+      - proxy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-unifiedcron}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   api:
     build:
       context: .
@@ -6,11 +25,14 @@ services:
     container_name: unifiedcron-api
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-unifiedcron}:${POSTGRES_PASSWORD:-unifiedcron}@unifiedcron-db:5432/${POSTGRES_DB:-unifiedcron}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - API_PORT=3001
     ports:
       - "${API_PORT:-3001}:3001"
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
       - proxy
     restart: unless-stopped
@@ -30,7 +52,7 @@ services:
     container_name: unifiedcron-web
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-unifiedcron}:${POSTGRES_PASSWORD:-unifiedcron}@unifiedcron-db:5432/${POSTGRES_DB:-unifiedcron}
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3001}
       - INTERNAL_API_URL=http://unifiedcron-api:3001
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
@@ -39,7 +61,10 @@ services:
     ports:
       - "${WEB_PORT:-3000}:3000"
     depends_on:
-      - api
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
     networks:
       - proxy
     restart: unless-stopped
@@ -70,6 +95,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
+volumes:
+  unifiedcron_postgres_data:
+    driver: local
 
 networks:
   proxy:
