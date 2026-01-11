@@ -9,6 +9,7 @@ services:
     volumes:
       - ./db-data:/var/lib/postgresql/data
       - ./packages/database/src/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./packages/database/src/auth-schema.sql:/docker-entrypoint-initdb.d/02-auth-schema.sql:ro
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     networks:
@@ -100,10 +101,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-
-volumes:
-  unifiedcron_postgres_data:
-    driver: local
 
 networks:
   unifiedcron_internal:
