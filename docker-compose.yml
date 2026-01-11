@@ -51,6 +51,8 @@ services:
     build:
       context: .
       dockerfile: apps/landing/Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://dashboard.unifiedcron.com}
     container_name: unifiedcron-landing
     environment:
       - NODE_ENV=production

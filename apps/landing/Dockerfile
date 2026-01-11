@@ -18,6 +18,10 @@ RUN pnpm install --frozen-lockfile
 # Build stage
 FROM deps AS build
 
+# Set environment variable for build (NEXT_PUBLIC_ vars are inlined at build time)
+ARG NEXT_PUBLIC_APP_URL=https://dashboard.unifiedcron.com
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+
 # Copy source files after dependencies are installed
 COPY apps/landing ./apps/landing
 
