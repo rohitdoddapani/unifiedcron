@@ -47,8 +47,12 @@ const PORT = process.env.API_PORT || 3001;
 app.use(helmet());
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? process.env.FRONTEND_URL 
-    : 'http://localhost:3000',
+    ? [
+        process.env.FRONTEND_URL || 'https://dashboard.unifiedcron.com',
+        'https://dashboard.unifiedcron.com',
+        'https://unifiedcron.com'
+      ]
+    : ['http://localhost:3000', 'http://localhost:3002'],
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
