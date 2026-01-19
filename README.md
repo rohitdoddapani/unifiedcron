@@ -38,14 +38,22 @@ cp docker-compose.env.example .env
 
 3. **Start all services**:
 ```bash
-docker compose up -d
+docker compose -f docker-compose.selfhost.yml up -d
 ```
 
 4. **Access the application**:
    - Frontend: http://localhost:3000
    - API: http://localhost:3001
 
-See [Docker Setup Guide](./docs/DOCKER_SETUP.md) for detailed instructions.
+See the Docker Setup Guide at https://docs.unifiedcron.com/docker-setup for detailed instructions.
+
+## Hetzner Deployment
+
+For the production server (landing + dashboard), use:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
 
 ## Development Setup
 
@@ -88,7 +96,7 @@ This will start:
 - Frontend at http://localhost:3000
 - API at http://localhost:3001
 
-See [Development Guide](./docs/DEVELOPMENT.md) for more details.
+See the Development Guide at https://docs.unifiedcron.com/development for more details.
 
 ## Architecture
 
@@ -116,7 +124,7 @@ See [Development Guide](./docs/DEVELOPMENT.md) for more details.
 - Reads from `cron.job` and `cron.job_run_details` via public views
 - Requires project URL and anonymous key
 - Discover all active cron jobs from your Supabase databases
-- See [Supabase Setup Guide](./docs/SUPABASE_SETUP.md) for detailed instructions
+- See the Supabase Setup Guide at https://docs.unifiedcron.com/supabase-setup for detailed instructions
 
 ### 🚧 Coming Soon
 - **GitHub Actions**: Parse `.github/workflows/*.yml` files for cron schedules
@@ -126,7 +134,7 @@ See [Development Guide](./docs/DEVELOPMENT.md) for more details.
 
 ## Getting Started with Supabase
 
-1. **Set up database views** in your Supabase project (see [Supabase Setup Guide](./docs/SUPABASE_SETUP.md))
+1. **Set up database views** in your Supabase project (see https://docs.unifiedcron.com/supabase-setup)
 2. **Get your credentials**: Project URL and Anonymous Key from Supabase dashboard
 3. **Connect in UnifiedCron**: Add connection via the Connections page
 4. **Discover jobs**: Refresh jobs to see all your cron schedules
@@ -153,7 +161,8 @@ unifiedcron/
 │   ├── database/     # Database schema and migrations
 │   ├── shared/       # Shared types and utilities
 │   └── integrations/ # Platform-specific parsers
-└── docs/            # Documentation
+└── docs/            # Documentation (source markdown)
+└── docs-site/       # Docs site (Nextra)
 ```
 
 ### Available Scripts
@@ -175,3 +184,9 @@ unifiedcron/
 ## License
 
 MIT License - see LICENSE file for details
+
+## Documentation
+
+- Docs site: https://docs.unifiedcron.com
+- Source markdown: `docs/`
+- Nextra site: `docs-site/` (deploy this folder to Vercel)

@@ -1,0 +1,13 @@
+{
+  "index": "Home",
+  "quick-start": "Quick Start",
+  "supabase-setup": "Supabase Setup",
+  "authentication": "Authentication",
+  "auth-setup-checklist": "Auth Setup Checklist",
+  "database-setup": "Database Setup",
+  "database-connection": "Database Connection",
+  "docker-setup": "Docker Setup",
+  "development": "Development",
+  "local-testing-fixes": "Local Testing Fixes",
+  "troubleshooting": "Troubleshooting"
+}
