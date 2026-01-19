@@ -6,5 +6,11 @@
       "src": "docs-site/package.json",
       "use": "@vercel/next"
     }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "docs-site/$1"
+    }
   ]
 }
