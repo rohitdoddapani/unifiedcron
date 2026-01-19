@@ -3,7 +3,7 @@
   "installCommand": "pnpm install",
   "builds": [
     {
-      "src": "docs-site/package.json",
+      "src": "docs-site/next.config.mjs",
       "use": "@vercel/next"
     }
   ]
