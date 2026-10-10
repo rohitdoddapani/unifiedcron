@@ -13,7 +13,7 @@ export class NotificationService {
        SELECT ne.id, $1, 'alert.failure', $3::jsonb, 'pending', NOW()
        FROM notification_endpoints ne WHERE ne."userId" = $2 AND ne.active = true
        AND ne."createdAt" <= (SELECT "createdAt" FROM alerts WHERE id = $1)
-       ON CONFLICT ("endpointId", "alertId") DO NOTHING`,
+       ON CONFLICT ("endpointId", "alertId", event) DO NOTHING`,
       [alertId, userId, JSON.stringify(payload)]
     );
     return result.rowCount || 0;
@@ -21,16 +21,17 @@ export class NotificationService {
 
   // Repair the outbox if a process stopped between alert creation and enqueueing.
   async reconcileAlerts(): Promise<void> {
-    await query(`INSERT INTO notification_deliveries ("endpointId", "alertId", event, payload, "nextRetryAt")
-      SELECT ne.id, a.id, 'alert.failure', jsonb_build_object(
-        'event', 'alert.failure', 'alertId', a.id, 'sourceRunId', a."sourceRunId",
-        'createdAt', a."createdAt", 'job', jsonb_build_object('id', j.id, 'name', j.name), 'details', a.details), NOW()
-      FROM alerts a JOIN jobs j ON a."jobId" = j.id
-      JOIN connections c ON j."connectionId" = c.id
-      JOIN notification_endpoints ne ON ne."userId" = c."userId"
-      WHERE ne.active = true AND ne."createdAt" <= a."createdAt"
-        AND a.type = 'failure' AND a."sourceRunId" IS NOT NULL
-      ON CONFLICT ("endpointId", "alertId") DO NOTHING`);
+    await query(`INSERT INTO notification_deliveries ("endpointId","alertId",event,payload,"nextRetryAt")
+      SELECT ne.id,a.id,ev.event,jsonb_build_object('event',ev.event,'alertId',a.id,'sourceRunId',a."sourceRunId",
+        'createdAt',ev.at,'job',jsonb_build_object('id',j.id,'name',j.name),'details',a.details),NOW()
+      FROM alerts a JOIN jobs j ON a."jobId"=j.id JOIN connections c ON j."connectionId"=c.id
+      JOIN notification_endpoints ne ON ne."userId"=c."userId"
+      CROSS JOIN LATERAL (VALUES ('alert.failure',a."createdAt"),('alert.resolved',a."resolvedAt")) ev(event,at)
+      WHERE ne.active=true AND ne."createdAt"<=a."createdAt" AND a.type='failure'
+        AND j."supersededById" IS NULL AND NOT (COALESCE(a.details,'{}') ? 'supersededByAlertId')
+        AND a."sourceRunId" IS NOT NULL AND COALESCE(a.details->>'backfill','false')<>'true'
+        AND (ev.event='alert.failure' OR (a.status='resolved' AND a."incidentModel"=true))
+      ON CONFLICT ("endpointId","alertId",event) DO NOTHING`);
   }
 
   async processPendingDeliveries(): Promise<void> {
@@ -54,6 +55,9 @@ export class NotificationService {
           SELECT d.id FROM notification_deliveries d JOIN notification_endpoints ne ON ne.id = d."endpointId"
           WHERE d.status IN ('pending','retrying') AND ne.active = true
             AND d.attempt < $1 AND d."claimToken" IS NULL AND d."nextRetryAt" <= NOW()
+            AND (d.event <> 'alert.resolved' OR NOT EXISTS (
+              SELECT 1 FROM notification_deliveries opener WHERE opener."endpointId"=d."endpointId"
+              AND opener."alertId"=d."alertId" AND opener.event='alert.failure' AND opener.status IN ('pending','retrying')))
           ORDER BY d."nextRetryAt", d.id LIMIT 20 FOR UPDATE OF d SKIP LOCKED
         ), claimed AS (
           UPDATE notification_deliveries d SET "claimToken" = gen_random_uuid(),

@@ -8,14 +8,15 @@ Keep that key unchanged during upgrades.
 
 ## Events and Verification
 
-An active endpoint receives `alert.failure` events for failed runs owned by the endpoint's user.
+An active endpoint receives `alert.failure` when an incident opens and `alert.resolved` when it closes.
+Repeated failures attach to the same incident and do not send a notification per run.
 Endpoints created after a failure do not receive that historical event.
 The **Send test** action queues a `webhook.test` event through the same durable delivery pipeline.
 The API returns HTTP 202 with a delivery ID; check delivery history for the result.
 
 Headers:
 
-- `x-unifiedcron-event`: `alert.failure` or `webhook.test`.
+- `x-unifiedcron-event`: `alert.failure`, `alert.resolved`, or `webhook.test`.
 - `x-unifiedcron-delivery-id`: stable across retries. Use this to deduplicate effects.
 - `x-unifiedcron-timestamp`: Unix milliseconds, refreshed for every attempt.
 - `x-unifiedcron-signature`: lowercase hex HMAC-SHA256 of `timestamp + '.' + rawBody`.
@@ -61,11 +62,13 @@ Database leases and row locks prevent concurrent workers from claiming the same 
 Each attempt has start/end time, outcome, HTTP status, capped response text and error details.
 A crashed worker's lease expires after 120 seconds; recovery records the unknown outcome as a failed attempt
 and follows the retry policy. Delivery is **at least once**, so receivers must deduplicate using delivery ID.
-An outbox reconciliation step repairs a crash between alert creation and notification enqueueing.
+An outbox reconciliation step repairs a crash between incident changes and notification enqueueing.
+Resolution delivery waits until its opening delivery has succeeded or reached terminal failure, preserving event order.
 
 Pause retains queued deliveries; resume allows the backlog to continue. Delete removes the endpoint
 and its delivery/attempt history. Failed events remain visible until endpoint deletion or parent alert retention cleanup.
-Job runs are retained for 30 days; alerts for 90 days, with associated deliveries removed by cascade.
+Job runs are retained for 30 days; resolved alerts for 90 days, with associated deliveries removed by cascade.
+Open incidents are not removed by age. Provider error messages are capped and pruned after seven days by daily maintenance.
 
 ## Destination Policy
 

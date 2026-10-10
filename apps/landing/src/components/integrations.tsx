@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 const integrations = [
   {
     name: "Supabase",
-    description: "pg_cron via public views",
+    description: "pg_cron via a scoped PostgreSQL reader",
   },
   {
     name: "GitHub Actions",
@@ -36,7 +36,7 @@ export function Integrations() {
           <SectionHeader
             badge="Integrations"
             title="Start with the essentials"
-            description="Connect your favorite platforms and aggregate all cron jobs into a single view."
+            description="Supabase is the only supported integration today. The other platforms below are on the roadmap."
             align="left"
             className="mb-0 lg:mb-0"
           />
@@ -62,10 +62,10 @@ export function Integrations() {
                   visible: { opacity: 1, x: 0 },
                 }}
               >
-                <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-500" />
+                <CheckCircle2 className={`mt-0.5 h-5 w-5 flex-shrink-0 ${integration.name === 'Supabase' ? 'text-emerald-500' : 'text-zinc-400'}`} />
                 <div>
                   <span className="font-medium text-zinc-900 dark:text-zinc-50">
-                    {integration.name}
+                    {integration.name} {integration.name === 'Supabase' ? '(available)' : '(planned)'}
                   </span>
                   <span className="text-zinc-500 dark:text-zinc-400">
                     {" "}
@@ -77,8 +77,8 @@ export function Integrations() {
           </motion.div>
 
           <p className="mt-8 text-sm text-zinc-500 dark:text-zinc-400">
-            Private repos supported via provider tokens. Vercel/Netlify read via
-            repo or manual file upload.
+            GitHub repository discovery, Vercel/Netlify imports and n8n workflow
+            discovery are not currently available in the dashboard.
           </p>
         </div>
 

@@ -10,6 +10,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "cron-parser": "5.4.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {

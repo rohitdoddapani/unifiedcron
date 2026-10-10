@@ -5,7 +5,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'UnifiedCron - One dashboard for all your cron jobs',
-  description: 'Discover, monitor, and get alerts for scheduled tasks across Supabase, GitHub, Vercel, Netlify, and n8n—without giving up your keys.',
+  description: 'Discover scheduled jobs across your Supabase projects and view their history in one dashboard. Additional integrations are planned.',
 };
 
 export default function RootLayout({

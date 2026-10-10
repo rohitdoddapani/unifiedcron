@@ -21,7 +21,7 @@ export class AlertService {
 
     const client = await getClient();
     const lockScope = data.jobId;
-    const lockKey = `${data.type}:${data.sourceRunId}`;
+    const lockKey = data.type;
 
     try {
       await client.query('BEGIN');
@@ -39,6 +39,16 @@ export class AlertService {
       if (existing.rows.length > 0) {
         await client.query('COMMIT');
         return { alert: existing.rows[0], created: false };
+      }
+
+      const open = await client.query("SELECT * FROM alerts WHERE \"jobId\"=$1 AND type=$2 AND status='open' FOR UPDATE", [data.jobId,data.type]);
+      if (open.rows[0]) {
+        const alert = open.rows[0];
+        const details = { ...alert.details, failureCount: Number(alert.details?.failureCount || 1)+1,
+          lastFailedRunId: data.sourceRunId, lastFailedAt: data.details?.jobRun?.startTime || new Date().toISOString() };
+        await client.query('UPDATE alerts SET details=$2::jsonb,"updatedAt"=NOW() WHERE id=$1', [alert.id,JSON.stringify(details)]);
+        await client.query('COMMIT');
+        return { alert: { ...alert, details }, created: false };
       }
 
       const inserted = await client.query(

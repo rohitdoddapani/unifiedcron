@@ -9,6 +9,9 @@ The current delivery target is single-tenant self-hosting with multiple users an
 Supabase is the first integration to harden for production. Other providers belong to a later hardening phase.
 Monitoring runs in a dedicated worker, separate from the API. Alert channels for v1 are in-app and webhooks.
 Upgrades must preserve existing data and encrypted connection credentials.
+Private product positioning and roadmap notes may exist locally in `docs/PRODUCT_DIRECTION.md`.
+The owner requested that this strategy document remain untracked; read it if present, but do not publish it.
+Public technical follow-up and owner actions are in `docs/REVIEW_FIXES.md`.
 
 ## Workspace and Access
 
@@ -40,6 +43,28 @@ Upgrades must preserve existing data and encrypted connection credentials.
 - `scripts/smoke-compose.sh`: local migration and API/web/worker smoke flow.
 
 ## Roadmap and Evidence
+
+### Security/Ingestion Review Follow-up
+
+See `docs/REVIEW_FIXES.md` and the rewritten `docs/SUPABASE_SETUP.md`.
+New connections require a dedicated PostgreSQL reader with verified TLS, private metadata views,
+checked/pinned DNS and cloud-host restrictions. API responses hide connection credentials.
+Legacy configs remain decryptable but monitoring through anon/PostgREST is disabled; owners must run
+`docs/supabase-cleanup.sql` in their cloud project's SQL Editor and switch credentials.
+The app cannot revoke upstream public grants with an anon key. Do not report cloud cleanup as completed without evidence.
+
+Worker ingestion now rediscovers jobs, pages by numeric runid, refreshes unfinished runs, and commits
+cache changes with stream cursors. Stable job IDs survive renames and missing jobs are archived.
+First sync is bounded to seven days / 10,000 rows; purge gaps and catch-up/error state are visible.
+Failures accumulate in one open incident; open/resolve notifications have independent idempotency keys.
+Polling is normally every minute with concurrency/backoff, separate from 15-second notification dispatch.
+Migration 006 preserves historical rows and consolidates duplicates without deleting history.
+Test coverage includes real PostgreSQL TLS/RLS fixtures, denied writes/commands, API credential redaction,
+1,105-run paging, status updates, rollback/replay, gaps, failure storms and safe recovery ordering.
+Cloud reader/pooler validation still requires owner-supplied credentials.
+
+Missed-run/duration detection, workspace grouping and further live integrations remain roadmap work.
+Hosting/pricing decisions are not changed by this review patch. Non-Supabase landing claims are marked planned.
 
 ### Milestone 1: Security, Identity, Schema Integrity
 
@@ -137,7 +162,7 @@ POSTGRES_PORT=5434 docker compose --env-file .env.local -f docker-compose.selfho
 - Local PostgreSQL: `127.0.0.1:5434`; container PostgreSQL port: 5432.
 - Persistent DB files: `./db-data`; never delete/reset them to repair migrations.
 - `pnpm dev` starts web/API only; start `pnpm dev:worker` separately with appropriate environment.
-- Worker monitoring runs every five minutes; daily cleanup is scheduled at 02:00 in the runtime timezone.
+- Worker monitoring normally runs every minute with per-connection retry/backoff; daily cleanup runs at 02:00 in the runtime timezone.
 - Webhook dispatch runs independently every 15 seconds. Worker host port is now loopback-only.
 
 Environment contract: `DATABASE_URL`, `ENCRYPTION_KEY`, `JWT_SECRET`, `NEXTAUTH_SECRET`,
@@ -170,12 +195,13 @@ POSTGRES_PORT=5434 SMOKE_BUILD=true KEEP_STACK_RUNNING=true pnpm smoke:compose
 Migrations: `001_runtime_integrity.sql`, `002_notifications.sql`,
 `003_normalize_connection_config.sql`, `004_delivery_uniqueness.sql`.
 M3 adds `005_webhook_reliability.sql` for leases, attempt history and encrypted-secret metadata.
+The review adds `006_secure_ingestion_incidents.sql` for cursor/freshness state, stable identities and incidents.
 Add new ordered migrations rather than assuming base schema edits upgrade an existing database.
 Retain legacy encrypted-config reader compatibility until migration behavior is verified.
 
 The smoke script is mutating: it runs migrations and inserts test users/connections/jobs/alerts.
 It defaults to stopping the stack afterward unless `KEEP_STACK_RUNNING=true`.
-It also prints its database URL, so do not run it against production or capture sensitive credentials in shared logs.
+Do not run it against production. Migration logging omits the database URL/password.
 Expected local success marker: `COMPOSE_SMOKE_OK`.
 
 ## Production Topology
@@ -195,7 +221,7 @@ Do not run the local compose smoke script against production.
 
 - Inspect `git status` first and preserve any existing uncommitted work.
 - Do not reset, discard, or overwrite unrelated work. Create branches with the `codex/` prefix when needed.
-- Never commit env secrets or `db-data`; it currently appears untracked and is not excluded by `.gitignore`.
+- Never commit env secrets, `db-data` or the owner's private strategy notes; all are excluded by `.gitignore`.
 - Derive API identity from verified tokens; never restore client-controlled `userId` tenancy.
 - Keep API and worker config decryption and alert identity semantics aligned.
 - Distinguish source implementation, historical local tests, current local runtime checks, and production verification in reports.

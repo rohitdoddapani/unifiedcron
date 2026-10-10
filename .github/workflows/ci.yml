@@ -14,6 +14,7 @@ jobs:
       ENCRYPTION_KEY: ci-encryption-key
       DATABASE_URL: postgres://ci:ci@localhost:5432/unifiedcron_ci_test
       TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/unifiedcron_ci_test
+      TEST_CA_CERTIFICATE: /tmp/unifiedcron-test-ca.pem
     services:
       postgres:
         image: postgres:16-alpine
@@ -23,6 +24,7 @@ jobs:
           POSTGRES_DB: unifiedcron_ci_test
         ports: [5432:5432]
         options: >-
+          --label unifiedcron.test=true
           --health-cmd "pg_isready -U ci" --health-interval 5s
           --health-timeout 5s --health-retries 10
 
@@ -52,6 +54,11 @@ jobs:
 
       - name: Test
         run: pnpm test:unit
+
+      - name: Configure isolated PostgreSQL TLS
+        env:
+          TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: node scripts/setup-test-tls.cjs
 
       - name: Database integration tests
         run: pnpm test:integration

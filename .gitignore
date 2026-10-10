@@ -9,6 +9,7 @@ build/
 .next/
 
 # Environment variables
+docs/PRODUCT_DIRECTION.md
 .env
 .env.local
 .env.development.local

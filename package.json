@@ -27,7 +27,7 @@
     "smoke:compose": "scripts/smoke-compose.sh",
     "build:services": "pnpm --filter @unifiedcron/shared build && pnpm --filter @unifiedcron/database build && pnpm --filter @unifiedcron/integrations build && pnpm --filter api build && pnpm --filter worker build",
     "test:unit": "node --test tests/*.unit.test.cjs",
-    "test:integration": "node --test tests/*.integration.test.cjs"
+    "test:integration": "node --test --test-concurrency=1 tests/*.integration.test.cjs"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

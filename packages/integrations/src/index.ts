@@ -3,4 +3,5 @@
 // export * from './vercel';
 // export * from './netlify';
 export * from './supabase';
+export * from './supabase-setup';
 // export * from './n8n';

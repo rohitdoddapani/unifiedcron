@@ -22,7 +22,7 @@ export function errorHandler(
   // Handle specific error types
   if (error instanceof ZodError) {
     res.status(400).json({ success: false, error: error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; ') });
-  } else if (error.name === 'WebhookValidationError') {
+  } else if (error.name === 'WebhookValidationError' || error.name === 'SupabaseConnectionError' || error.name === 'MigrationRequiredError') {
     res.status(400).json({ success: false, error: error.message });
   } else if (error.name === 'ValidationError') {
     res.status(400).json(response);

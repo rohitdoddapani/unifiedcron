@@ -109,6 +109,10 @@ export const api = {
     });
   },
 
+  async getSupabaseSetup() {
+    return apiRequest<{ sql: string; username: string }>('/api/connections/supabase/setup');
+  },
+
   async getJobs(options?: { platform?: string; limit?: number; offset?: number }) {
     const params = new URLSearchParams({
       ...(options?.platform && { platform: options.platform }),

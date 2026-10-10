@@ -9,7 +9,7 @@ const steps = [
     icon: Link2,
     step: "01",
     title: "Connect",
-    description: "Add Supabase, GitHub, Vercel, Netlify, or n8n.",
+    description: "Connect your Supabase projects with a dedicated read-only database role.",
   },
   {
     icon: RefreshCw,

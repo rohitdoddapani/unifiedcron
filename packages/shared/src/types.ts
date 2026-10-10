@@ -6,6 +6,9 @@ export type Platform = z.infer<typeof PlatformSchema>;
 
 // Connection types
 export const ConnectionConfigSchema = z.object({
+  mode: z.enum(['postgres', 'legacy_anon']).optional(),
+  connectionString: z.string().optional(),
+  caCertificate: z.string().optional(),
   projectUrl: z.string().optional(),
   anonKey: z.string().optional(),
   repo: z.string().optional(),
@@ -39,6 +42,7 @@ export const JobSchema = z.object({
   project: z.string(),
   metadata: z.record(z.any()),
   lastSeenAt: z.date(),
+  removedAt: z.date().nullable().optional(),
 });
 
 export type Job = z.infer<typeof JobSchema>;

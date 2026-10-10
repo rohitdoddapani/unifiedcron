@@ -80,15 +80,15 @@ This document explains what was fixed to enable local testing of the Supabase co
 
 1. **Set up Supabase** (if not done):
    - Run SQL from `docs/supabase-setup.sql` in Supabase SQL Editor
-   - Get Project URL and Anonymous Key from Supabase dashboard
+   - Create the dedicated reader and obtain its session-pooler connection string
 
 2. **Test in UnifiedCron**:
    - Go to http://localhost:3000/connections
    - Click "Add Supabase Connection"
    - Fill in:
      - Label: "Test Connection"
-     - Project URL: Your Supabase project URL
-     - Anonymous Key: Your Supabase anon key
+     - PostgreSQL connection string: Dedicated reader credentials
+     - CA certificate: Project certificate if required
    - Click "Test & Connect"
 
 3. **What should happen**:

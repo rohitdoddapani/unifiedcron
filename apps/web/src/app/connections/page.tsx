@@ -24,13 +24,20 @@ const SUPABASE_PLATFORM = {
   color: 'bg-green-100 text-green-800',
   description: 'Discover and monitor pg_cron jobs in your Supabase database',
   fields: [
-    { name: 'projectUrl', label: 'Project URL', type: 'url', placeholder: 'https://your-project.supabase.co' },
-    { name: 'anonKey', label: 'Anonymous Key', type: 'password', placeholder: 'eyJ...' }
+    { name: 'connectionString', label: 'Project URL', type: 'url', placeholder: 'https://your-project.supabase.co' },
+    { name: 'caCertificate', label: 'Anonymous Key', type: 'password', placeholder: 'eyJ...' }
   ]
 };
 
 function ConnectionsPageContent() {
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [setupSql, setSetupSql] = useState('');
+  async function openSetup(id: string | null = null) {
+    setEditingId(id); setShowAddForm(true);
+    const response = await api.getSupabaseSetup();
+    if (response.success && response.data) setSetupSql(response.data.sql);
+  }
   const [connections, setConnections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -40,13 +47,12 @@ function ConnectionsPageContent() {
   // Form state
   const [formData, setFormData] = useState({
     label: '',
-    projectUrl: '',
-    anonKey: ''
+    connectionString: '',
+    caCertificate: ''
   });
 
   const fetchConnections = useCallback(async () => {
     try {
-      setLoading(true);
       const response = await api.getConnections();
       if (response.success && response.data && Array.isArray(response.data)) {
         setConnections(response.data);
@@ -88,7 +94,9 @@ function ConnectionsPageContent() {
 
   useEffect(() => {
     initialize();
-  }, [initialize]);
+    const timer = setInterval(() => void fetchConnections(), 30000);
+    return () => clearInterval(timer);
+  }, [initialize, fetchConnections]);
 
   const handleDeleteConnection = async (connectionId: string) => {
     if (!confirm('Are you sure you want to delete this connection?')) {
@@ -161,20 +169,14 @@ function ConnectionsPageContent() {
 
     try {
       // Create the connection
-      const response = await api.createConnection({
-        platform: 'supabase',
-        label: formData.label,
-        config: {
-          projectUrl: formData.projectUrl,
-          anonKey: formData.anonKey
-        }
-      });
+      const config = { mode: 'postgres', connectionString: formData.connectionString, ...(formData.caCertificate ? { caCertificate: formData.caCertificate } : {}) };
+      const response = editingId ? await api.updateConnection(editingId, { label: formData.label, config }) : await api.createConnection({ platform: 'supabase', label: formData.label, config });
 
       if (response.success) {
         // Connection created successfully
         await fetchConnections(); // Refresh the list
         setShowAddForm(false);
-        setFormData({ label: '', projectUrl: '', anonKey: '' });
+        setFormData({ label: '', connectionString: '', caCertificate: '' });
         setError(null);
       } else {
         setError(response.error || 'Failed to create connection');
@@ -207,7 +209,7 @@ function ConnectionsPageContent() {
           </p>
         </div>
         <Button 
-          onClick={() => setShowAddForm(true)}
+          onClick={() => void openSetup()}
           className="btn-primary"
           disabled={loading}
         >
@@ -249,7 +251,7 @@ function ConnectionsPageContent() {
       {/* Add Connection Modal */}
       {showAddForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md relative">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl relative max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-semibold mb-4">
               Add Supabase Connection
             </h2>
@@ -265,6 +267,9 @@ function ConnectionsPageContent() {
                 </div>
               </div>
 
+              <p className="text-sm text-gray-600">Run the reader setup in your Supabase SQL editor, then use its session-pooler connection string with the generated password. This password is not saved until you submit the connection. If the reader role already exists, rotate it deliberately instead of rerunning CREATE ROLE.</p>
+              {setupSql && <details className="border rounded p-3"><summary className="cursor-pointer font-medium">Reader setup SQL (contains a generated password)</summary><pre className="whitespace-pre-wrap break-all text-xs max-h-48 overflow-auto mt-2">{setupSql}</pre><Button type="button" variant="outline" onClick={() => void navigator.clipboard.writeText(setupSql)}>Copy setup SQL</Button></details>}
+              {editingId && <p className="text-sm text-amber-800">Also run the legacy cleanup SQL from the setup guide to revoke public cron access. Existing history will be retained.</p>}
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -283,33 +288,24 @@ function ConnectionsPageContent() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Project URL
+                    PostgreSQL connection string
                   </label>
                   <input
-                    type="url"
-                    placeholder="https://your-project.supabase.co"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="postgresql://unifiedcron_reader.PROJECT_REF:PASSWORD@POOLER_HOST:5432/postgres"
                     className="input w-full"
-                    value={formData.projectUrl}
-                    onChange={(e) => setFormData({ ...formData, projectUrl: e.target.value })}
+                    value={formData.connectionString}
+                    onChange={(e) => setFormData({ ...formData, connectionString: e.target.value })}
                     required
                     disabled={submitting}
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Anonymous Key
-                  </label>
-                  <input
-                    type="password"
-                    placeholder="eyJ..."
-                    className="input w-full"
-                    value={formData.anonKey}
-                    onChange={(e) => setFormData({ ...formData, anonKey: e.target.value })}
-                    required
-                    disabled={submitting}
-                  />
-                </div>
+                <label className="block text-sm font-medium text-gray-700">CA certificate (when required by your database)
+                  <textarea rows={3} className="input w-full font-mono text-xs" value={formData.caCertificate}
+                    onChange={e => setFormData({ ...formData, caCertificate: e.target.value })} placeholder="-----BEGIN CERTIFICATE-----" />
+                </label>
 
                 {error && (
                   <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
@@ -337,7 +333,7 @@ function ConnectionsPageContent() {
                     variant="outline"
                     onClick={() => {
                       setShowAddForm(false);
-                      setFormData({ label: '', projectUrl: '', anonKey: '' });
+                      setFormData({ label: '', connectionString: '', caCertificate: '' });
                       setError(null);
                     }}
                     disabled={submitting}
@@ -351,7 +347,7 @@ function ConnectionsPageContent() {
             <button
               onClick={() => {
                 setShowAddForm(false);
-                setFormData({ label: '', projectUrl: '', anonKey: '' });
+                setFormData({ label: '', connectionString: '', caCertificate: '' });
                 setError(null);
               }}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
@@ -388,13 +384,18 @@ function ConnectionsPageContent() {
                       </div>
                     </div>
                     <Badge variant={connection.status === 'connected' || !connection.status ? 'default' : 'destructive'}>
-                      {connection.status === 'connected' || !connection.status ? 'Connected' : 'Error'}
+                      {connection.migrationRequired ? 'Migration needed' : connection.ingestion?.lastError ? 'Sync failing' : connection.ingestion?.lastSyncedAt ? 'Synced' : 'Not synced'}
                     </Badge>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2 text-sm text-gray-600">
                     <p>Created: {formatDate(connection.createdAt)}</p>
+                    <p>Last synced: {connection.ingestion?.lastSyncedAt ? new Date(connection.ingestion.lastSyncedAt).toLocaleString() : 'Not yet'}</p>
+                    {connection.ingestion?.cursor?.backlog && <p className="text-amber-700">Catching up: history is not fully current yet.</p>}
+                    {Number(connection.historyGaps) > 0 && <p className="text-amber-700">Possible upstream history gaps: {connection.historyGaps}. This history may be incomplete.</p>}
+                    {connection.ingestion?.lastError && <p className="text-red-700 break-words">{connection.ingestion.lastError}</p>}
+                    {connection.migrationRequired && <div className="rounded bg-amber-50 p-3 text-amber-900"><p>Anonymous-key access is unsafe and disabled. Revoke the legacy grants in Supabase and switch to the reader connection.</p><Button variant="outline" size="sm" onClick={() => { setFormData({ label: connection.label, connectionString: '', caCertificate: '' }); void openSetup(connection.id); }}>Switch to secure connection</Button></div>}
                     {connection.lastChecked && (
                       <p>Last checked: {formatDate(connection.lastChecked)}</p>
                     )}
@@ -453,7 +454,7 @@ function ConnectionsPageContent() {
             <p className="text-gray-500 mb-4">
               Connect your Supabase database to start discovering cron jobs
             </p>
-            <Button onClick={() => setShowAddForm(true)} className="btn-primary">
+            <Button onClick={() => void openSetup()} className="btn-primary">
               <Plus className="h-4 w-4 mr-2" />
               Add Supabase Connection
             </Button>

@@ -35,7 +35,7 @@ export function Hero() {
           >
             <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-sm font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-400">
               <Zap className="h-3.5 w-3.5" />
-              Now supporting Supabase, GitHub, Vercel, Netlify & n8n
+              Available today: Supabase pg_cron
             </span>
           </motion.div>
 
@@ -46,7 +46,7 @@ export function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
           >
-            One dashboard for all your{" "}
+            One view across your Supabase{" "}
             <span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent dark:from-emerald-400 dark:to-teal-400">
               cron jobs
             </span>
@@ -59,9 +59,9 @@ export function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
           >
-            Discover, monitor, and get alerts for scheduled tasks across
-            Supabase, GitHub, Vercel, Netlify, and n8n—without giving up your
-            keys.
+            Discover scheduled jobs across your Supabase projects and see their
+            run history in one place. GitHub, Vercel, Netlify and n8n integrations
+            are planned, not available yet.
           </motion.p>
 
           {/* CTAs */}

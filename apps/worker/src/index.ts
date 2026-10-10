@@ -43,7 +43,7 @@ async function dispatch() {
   } finally { dispatchRunning = false; }
 }
 
-const monitorTask = cron.schedule('*/5 * * * *', monitor);
+const monitorTask = cron.schedule('* * * * *', monitor);
 const cleanupTask = cron.schedule('0 2 * * *', async () => {
   if (!disabled && !stopping) {
     try { await monitoring.cleanupOldData(); }

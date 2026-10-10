@@ -1,11 +1,7 @@
 import { ParsedJob } from '@unifiedcron/shared';
 
-interface VercelFunction {
-  schedule?: string;
-}
-
 interface VercelConfig {
-  functions?: Record<string, VercelFunction>;
+  crons?: { path?: string; schedule?: string }[];
 }
 
 interface GitHubFileContent {
@@ -19,16 +15,17 @@ interface GitHubFileContent {
 export function parseVercelJson(jsonText: string): ParsedJob[] {
   try {
     const config = JSON.parse(jsonText) as VercelConfig;
-    if (!config.functions) {
+    if (!Array.isArray(config.crons)) {
       return [];
     }
 
     const jobs: ParsedJob[] = [];
     
-    for (const [functionPath, functionConfig] of Object.entries(config.functions)) {
-      if (functionConfig && typeof functionConfig === 'object' && 'schedule' in functionConfig) {
-        const schedule = functionConfig.schedule;
-        if (schedule && typeof schedule === 'string') {
+    for (const entry of config.crons) {
+      if (entry && typeof entry === 'object') {
+        const schedule = entry.schedule;
+        const functionPath = entry.path;
+        if (typeof schedule === 'string' && typeof functionPath === 'string' && functionPath.startsWith('/')) {
           jobs.push({
             name: functionPath,
             cron: schedule,

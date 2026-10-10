@@ -95,7 +95,7 @@ fi
 wait_for_compose_health "db" 120
 
 export DATABASE_URL="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}"
-echo "Running migrations with DATABASE_URL=${DATABASE_URL}"
+echo "Running migrations against the local compose database on port ${POSTGRES_PORT}"
 pnpm db:migrate
 
 if [[ "$SMOKE_BUILD" == "true" ]]; then
@@ -178,18 +178,17 @@ fi
 CONN_TMP="$(mktemp)"
 CONN_STATUS="$(curl -sS -o "$CONN_TMP" -w "%{http_code}" -X POST "http://localhost:${API_PORT}/api/connections" -H 'Content-Type: application/json' -H "Authorization: Bearer ${TOKEN}" -d '{"platform":"supabase","label":"smoke-alert-lifecycle","config":{"projectUrl":"https://example.supabase.co","anonKey":"anon"}}')"
 echo "CHECK connection-create-status=${CONN_STATUS}"
-if [[ "$CONN_STATUS" != "201" ]]; then
-  echo "FAIL /api/connections create returned ${CONN_STATUS}"
-  cat "$CONN_TMP"
+if [[ "$CONN_STATUS" != "400" ]]; then
+  echo "FAIL legacy anonymous connections must be rejected"
   exit 1
 fi
-
-CONNECTION_ID="$(node -e "const fs=require('fs'); const j=JSON.parse(fs.readFileSync(process.argv[1],'utf8')); process.stdout.write((j && j.data && j.data.id) || '');" "$CONN_TMP")"
-if [[ -z "$CONNECTION_ID" ]]; then
-  echo "FAIL /api/connections response missing id"
-  cat "$CONN_TMP"
-  exit 1
-fi
+# Seed a legacy compatibility fixture directly; no public anonymous connection is created.
+CONNECTION_ID="$(node -e "console.log(require('crypto').randomUUID())")"
+ENCRYPTED_CONFIG="$(pnpm --filter @unifiedcron/database exec node -e "const {encrypt}=require('@unifiedcron/shared');encrypt(JSON.stringify({projectUrl:'https://example.supabase.co',anonKey:'test-fixture'}),process.env.ENCRYPTION_KEY).then(value=>process.stdout.write(JSON.stringify({encrypted:value}))).catch(()=>process.exit(1));")"
+compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v connection_id="$CONNECTION_ID" -v user_id="$USER_ID" -v config="$ENCRYPTED_CONFIG" <<'SQL'
+INSERT INTO connections (id,"userId",platform,label,config)
+VALUES (:'connection_id',:'user_id','supabase','Legacy compatibility fixture',:'config'::jsonb);
+SQL
 
 JOB_ID="$(node -e "console.log(require('crypto').randomUUID())")"
 ALERT_ID="$(node -e "console.log(require('crypto').randomUUID())")"

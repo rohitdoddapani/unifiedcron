@@ -161,6 +161,8 @@ See [Webhook Notifications](./notifications) for signing verification, retries a
 - `notification_endpoints` - Webhook endpoint configuration
 - `notification_deliveries` - Webhook delivery attempts and retries
 - `notification_delivery_attempts` - Per-attempt outcomes and lease recovery history
+- `ingestion_state` - Stream cursors, freshness and connection retry state
+- `ingestion_gaps` - Possible upstream history gaps
 
 ### Views
 - `job_details` - Jobs with connection and statistics
@@ -174,16 +176,16 @@ See [Webhook Notifications](./notifications) for signing verification, retries a
 
 ## Monitoring
 
-The background worker runs every 5 minutes and:
-1. Ingests latest Supabase runs using deterministic `sourceRunId` (`supabase:<jobId>:<start_time>`)
-2. Upserts `jobRuns` idempotently (no duplicate run rows for the same run identity)
-3. Creates failure alerts idempotently keyed by failed run identity
-4. Auto-resolves open alerts when a subsequent run succeeds (with resolution metadata)
-5. Queues webhook deliveries for new failure alerts
+The worker normally polls each Supabase connection once per minute, with jitter, bounded concurrency and error backoff.
+It rediscovers stable job IDs, pages numerically by runid, refreshes unfinished statuses and commits run changes
+with cursor checkpoints. Initial backfill is bounded; upstream purge gaps and catch-up state remain visible.
+Missing jobs are archived, and names are display-only. Failures accumulate in one open incident per job/type;
+a newer successful run resolves it. Notifications fire on open/resolve, not on each failure.
 
 Webhook dispatch runs independently every 15 seconds, including when monitoring is disabled.
 Database leases prevent concurrent claims; retries use 1/5/15/30/60-minute backoff.
-The sixth unsuccessful attempt is terminal. An outbox repair step recovers missed enqueue operations.
+The sixth unsuccessful attempt is terminal. Outbox reconciliation repairs missed enqueue operations.
+
 
 Worker observability endpoints:
 - `GET http://localhost:3003/health`

@@ -151,24 +151,11 @@ ECONNREFUSED
 
 **Solution:**
 
-1. **Verify Supabase setup:**
-   - Run SQL from `docs/supabase-setup.sql` in Supabase SQL Editor
-   - Verify views exist: `cron_jobs_view` and `cron_job_run_logs`
+1. Follow the secure Supabase setup guide and revoke any legacy public cron interfaces.
+2. Use the dedicated reader's PostgreSQL session-pooler connection string, not an anon or service-role API key.
+3. Supply the project's CA certificate when required. Certificate verification is mandatory.
+4. Check private views `unifiedcron.jobs` / `unifiedcron.runs`, reader permissions and the connection's last sync error.
 
-2. **Check credentials:**
-   - Project URL should be: `https://xxxxx.supabase.co`
-   - Anonymous Key should start with: `eyJ...`
-   - Verify credentials in Supabase dashboard
-
-3. **Test connection manually:**
-   ```bash
-   # Use the test script
-   ./scripts/test-supabase-connection.sh <project-url> <anon-key>
-   ```
-
-4. **Check API logs:**
-   - Look for detailed error messages
-   - Verify the request reaches Supabase
 
 ### No Jobs Discovered
 

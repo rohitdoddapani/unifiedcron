@@ -91,26 +91,12 @@ Quick setup:
    - Frontend at http://localhost:3000
    - API at http://localhost:3001
 
-## Step 4: Set Up Supabase Connection
+## Step 4: Set Up a Secure Supabase Connection
 
-1. **In your Supabase project**, run the SQL from `docs/supabase-setup.sql`:
-   - Go to SQL Editor in Supabase dashboard
-   - Copy and paste the SQL
-   - Run it
+Follow the secure Supabase setup guide. Run the reader SQL in your project's SQL Editor and connect with
+its PostgreSQL session-pooler credentials and verified TLS. Anonymous/service-role API keys are not supported.
+If you used the previous public cron views, run the legacy cleanup SQL before switching the connection.
 
-2. **Get your Supabase credentials**:
-   - Project URL: Settings → API → Project URL
-   - Anonymous Key: Settings → API → anon public key
-
-3. **In UnifiedCron**:
-   - Go to http://localhost:3000
-   - Click "Connections" in the navigation
-   - Click "Add Supabase Connection"
-   - Enter:
-     - Label: e.g., "Production Database"
-     - Project URL: Your Supabase project URL
-     - Anonymous Key: Your anon key
-   - Click "Test & Connect"
 
 ## Troubleshooting
 
@@ -147,9 +133,9 @@ Quick setup:
 
 ### Connection Test Fails
 
-- Verify Supabase views are created (run SQL from `docs/supabase-setup.sql`)
+- Verify private reader views and permissions using the secure Supabase setup guide
 - Check Project URL is correct (should end with `.supabase.co`)
-- Verify Anonymous Key is correct (starts with `eyJ...`)
+- Verify reader credentials, private views and the TLS certificate
 - Check API logs for detailed error messages
 
 ## Next Steps

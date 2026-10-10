@@ -13,7 +13,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://unifiedcron.com";
 export const metadata: Metadata = {
   title: "UnifiedCron - One dashboard for all your cron jobs",
   description:
-    "Discover, monitor, and get alerts for scheduled tasks across Supabase, GitHub, Vercel, Netlify, and n8n—without giving up your keys.",
+    "Discover scheduled jobs across your Supabase projects and view their history in one dashboard. Additional integrations are planned.",
   keywords: [
     "cron jobs",
     "scheduled tasks",
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     url: siteUrl,
     title: "UnifiedCron - One dashboard for all your cron jobs",
     description:
-      "Discover, monitor, and get alerts for scheduled tasks across Supabase, GitHub, Vercel, Netlify, and n8n—without giving up your keys.",
+      "Discover scheduled jobs across your Supabase projects and view their history in one dashboard. Additional integrations are planned.",
     siteName: "UnifiedCron",
     images: [
       {
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "UnifiedCron - One dashboard for all your cron jobs",
     description:
-      "Discover, monitor, and get alerts for scheduled tasks across Supabase, GitHub, Vercel, Netlify, and n8n.",
+      "Discover and monitor cron jobs across your Supabase projects.",
     images: ["/og-image.png"],
   },
   robots: {

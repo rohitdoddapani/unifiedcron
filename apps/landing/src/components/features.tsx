@@ -17,19 +17,19 @@ const features = [
     icon: Eye,
     title: "Unified visibility",
     description:
-      "See every cron job in one clean table—no more hopping between platforms.",
+      "See discovered cron jobs across your Supabase projects in one table.",
   },
   {
     icon: Shield,
     title: "Read-only by default",
     description:
-      "Connect via public views or repo read tokens. Keep full control of your data.",
+      "Use a dedicated database reader with verified TLS and scoped metadata access. Credentials are encrypted at rest.",
   },
   {
     icon: Bell,
     title: "Failure alerts (MVP)",
     description:
-      "Detect failed runs for Supabase pg_cron and get notified by email or Slack.",
+      "See Supabase failure incidents in the dashboard and send signed webhook notifications. Native email and Slack channels are planned.",
   },
   {
     icon: Server,
@@ -41,13 +41,13 @@ const features = [
     icon: Clock,
     title: "Human-readable schedules",
     description:
-      "We parse cron strings and show clear next-run times in your timezone.",
+      "Inspect discovered job schedules. A timezone-aware next-run preview in the dashboard is planned.",
   },
   {
     icon: Puzzle,
-    title: "Simple to extend",
+    title: "More providers planned",
     description:
-      "Bring your own provider with small parser functions and a normalized job model.",
+      "GitHub and n8n discovery and a community integration SDK are on the roadmap.",
   },
 ];
 

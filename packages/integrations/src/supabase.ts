@@ -1,151 +1,143 @@
-import { ParsedJob } from '@unifiedcron/shared';
+import { Client, ClientConfig } from 'pg';
+import { lookup } from 'dns/promises';
+import { isIP } from 'net';
+import { ConnectionConfig, isPublicWebhookAddress, ParsedJob } from '@unifiedcron/shared';
 
-interface SupabaseCronJob {
-  jobid: number;
-  jobname: string;
-  schedule: string;
-  command: string;
-  nodename?: string;
-  nodeport?: number;
-  database?: string;
-  username?: string;
-  active?: boolean;
-  jobhost?: string;
+export interface SupabaseRun {
+  runid: string; jobid: string; status: string; start_time: string | null;
+  end_time: string | null; return_message: string | null;
+}
+export interface SupabaseSource {
+  discover(): Promise<ParsedJob[]>;
+  bounds(): Promise<{ min: string | null; max: string | null }>;
+  backfillFloor(): Promise<string>;
+  page(after: string, limit: number): Promise<SupabaseRun[]>;
+  unfinished(ids: string[]): Promise<SupabaseRun[]>;
+  close(): Promise<void>;
 }
 
-interface SupabaseCronJobRun {
-  jobid: number;
-  jobname: string;
-  status: string;
-  start_time: string;
-  end_time?: string;
-  return_message?: string;
+export function isAllowedSupabaseHost(hostname: string): boolean {
+  return /^db\.[a-z0-9-]+\.supabase\.co$/i.test(hostname) || /^[a-z0-9-]+\.pooler\.supabase\.com$/i.test(hostname);
 }
 
-/**
- * Fetches cron jobs from Supabase using the public API
- */
-export async function fetchSupabaseCronJobs(
-  projectUrl: string,
-  anonKey: string
-): Promise<ParsedJob[]> {
+export function supabaseProjectIdentity(config: ConnectionConfig): string | null {
   try {
-    const response = await fetch(
-      `${projectUrl}/rest/v1/cron_jobs_view`,
-      {
-        headers: {
-          'apikey': anonKey,
-          'Authorization': `Bearer ${anonKey}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Supabase API error: ${response.status} ${response.statusText}`);
+    if (config.mode !== 'postgres' && config.projectUrl) {
+      const match = /^([a-z0-9-]+)\.supabase\.co$/i.exec(new URL(config.projectUrl).hostname);
+      return match ? `cloud:${match[1].toLowerCase()}:postgres` : null;
     }
-
-    const jobs = await response.json() as SupabaseCronJob[];
-    
-    return jobs.map(job => ({
-      name: job.jobname,
-      cron: job.schedule,
-      metadata: {
-        jobId: job.jobid,
-        command: job.command,
-        database: job.database,
-        username: job.username,
-        active: job.active,
-        nodename: job.nodename,
-        nodeport: job.nodeport,
-        jobhost: job.jobhost
-      }
-    }));
-  } catch (error) {
-    console.error('Error fetching Supabase cron jobs:', error);
-    throw error;
-  }
+    if (!config.connectionString) return null;
+    const url = new URL(config.connectionString);
+    const direct = /^db\.([a-z0-9-]+)\.supabase\.co$/i.exec(url.hostname);
+    const user = decodeURIComponent(url.username);
+    const ref = direct?.[1] || (url.hostname.endsWith('.pooler.supabase.com') && user.includes('.') ? user.split('.').pop() : null);
+    const database = decodeURIComponent(url.pathname.slice(1) || 'postgres');
+    return ref ? `cloud:${ref.toLowerCase()}:${database}` : `${url.hostname}:${url.port || 5432}:${database}`;
+  } catch { return null; }
 }
 
-/**
- * Fetches recent job runs from Supabase for monitoring
- */
-export async function fetchSupabaseJobRuns(
-  projectUrl: string,
-  anonKey: string
-): Promise<SupabaseCronJobRun[]> {
-  try {
-    const response = await fetch(
-      `${projectUrl}/rest/v1/cron_job_run_logs?select=jobid,jobname,status,start_time,end_time,return_message&order=start_time.desc&limit=100`,
-      {
-        headers: {
-          'apikey': anonKey,
-          'Authorization': `Bearer ${anonKey}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+export async function postgresClientConfig(config: ConnectionConfig): Promise<ClientConfig> {
+  if (config.mode !== 'postgres' || !config.connectionString) throw migrationError();
+  let url: URL;
+  try { url = new URL(config.connectionString); } catch { throw new Error('Invalid PostgreSQL connection string'); }
+  if (!['postgres:', 'postgresql:'].includes(url.protocol) || url.hash || !url.username || !url.password) throw new Error('Use a PostgreSQL connection string with dedicated reader credentials');
+  const host = url.hostname.replace(/^\[|\]$/g, '');
+  if (process.env.SUPABASE_ALLOW_CUSTOM_HOSTS !== 'true' && !isAllowedSupabaseHost(host)) throw new Error('Only Supabase database and pooler hosts are allowed');
+  // URI SSL parameters never override the explicit verified TLS configuration below.
+  if (url.searchParams.has('sslmode') && !['require', 'verify-ca', 'verify-full'].includes(url.searchParams.get('sslmode')!)) throw new Error('TLS is required');
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const addresses = isIP(host) ? [{ address: host, family: isIP(host) }] : await Promise.race([
+    lookup(host, { all: true, verbatim: true }),
+    new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Database DNS lookup timed out')), 5000); }),
+  ]).finally(() => clearTimeout(timer));
+  if (!addresses.length || (process.env.SUPABASE_ALLOW_PRIVATE_NETWORK !== 'true' && addresses.some(item => !isPublicWebhookAddress(item.address)))) throw new Error('Private or reserved database addresses are disabled');
+  const port = Number(url.port || 5432);
+  if (![5432, 6543].includes(port) && process.env.SUPABASE_ALLOW_CUSTOM_HOSTS !== 'true') throw new Error('Unsupported Supabase database port');
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid database port');
+  return {
+    host: addresses[0].address, port, user: decodeURIComponent(url.username), password: decodeURIComponent(url.password),
+    database: decodeURIComponent(url.pathname.slice(1) || 'postgres'), application_name: 'UnifiedCron',
+    ssl: { rejectUnauthorized: true, servername: host, ...(config.caCertificate ? { ca: config.caCertificate } : {}) },
+    connectionTimeoutMillis: 8000, query_timeout: 5000,
+  };
+}
 
-    if (!response.ok) {
-      throw new Error(`Supabase API error: ${response.status} ${response.statusText}`);
+export function migrationError(): Error {
+  const error = new Error('Legacy anon-key monitoring is disabled. Run the cleanup SQL and switch to a dedicated read-only PostgreSQL connection.');
+  error.name = 'MigrationRequiredError'; return error;
+}
+
+export async function openSupabaseSource(config: ConnectionConfig): Promise<SupabaseSource> {
+  const client = new Client(await postgresClientConfig(config));
+  try {
+    await client.connect();
+    const roles = await client.query(`SELECT r.rolsuper, r.rolcreatedb, r.rolcreaterole, r.rolbypassrls,
+      EXISTS (SELECT 1 FROM pg_auth_members WHERE member = r.oid) AS membership
+      FROM pg_roles r WHERE r.rolname = current_user`);
+    const role = roles.rows[0];
+    if (!role || role.rolsuper || role.rolcreatedb || role.rolcreaterole || role.rolbypassrls || role.membership) throw new Error('Use the dedicated reader role, without privileged role memberships');
+    const grants = (await client.query(`SELECT
+      EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE c.relkind IN ('r','p','v','f') AND n.nspname NOT LIKE 'pg_%' AND n.nspname<>'information_schema'
+        AND has_schema_privilege(current_user,n.oid,'USAGE')
+        AND (has_table_privilege(current_user,c.oid,'INSERT,UPDATE,DELETE,TRUNCATE')
+          OR has_any_column_privilege(current_user,c.oid,'INSERT,UPDATE')))
+        OR has_database_privilege(current_user,current_database(),'CREATE')
+        OR EXISTS (SELECT 1 FROM pg_namespace n WHERE n.nspname NOT LIKE 'pg_%'
+          AND n.nspname<>'information_schema' AND has_schema_privilege(current_user,n.oid,'CREATE')) AS writes,
+      EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE p.prosecdef AND p.prorettype NOT IN ('trigger'::regtype,'event_trigger'::regtype)
+        AND n.nspname NOT LIKE 'pg_%' AND n.nspname<>'information_schema'
+        AND has_schema_privilege(current_user,n.oid,'USAGE')
+        AND has_function_privilege(current_user,p.oid,'EXECUTE')) AS definers`)).rows[0];
+    if (grants.writes || grants.definers) throw new Error('Reader has additional write or security-definer access through existing grants. Restrict those project privileges before connecting.');
+    // The reader must not be able to read commands, even when no rows exist.
+    try {
+      await client.query('SELECT command FROM cron.job LIMIT 0');
+      throw new Error('Reader can access cron commands. Revoke that privilege before connecting.');
+    } catch (error) {
+      if ((error as { code?: string }).code !== '42501') throw error;
     }
-
-    return await response.json() as SupabaseCronJobRun[];
-  } catch (error) {
-    console.error('Error fetching Supabase job runs:', error);
-    throw error;
-  }
+    await client.query('SELECT jobid, jobname, schedule, active FROM unifiedcron.jobs LIMIT 0');
+    await client.query('SELECT runid, jobid, status, start_time, end_time, return_message FROM unifiedcron.runs LIMIT 0');
+  } catch (error) { await client.end(); throw error; }
+  return {
+    async discover() {
+      const result = await client.query('SELECT jobid, jobname, schedule, active FROM unifiedcron.jobs ORDER BY jobid');
+      return result.rows.map(row => ({ name: row.jobname || `Job ${row.jobid}`, cron: row.schedule,
+        metadata: { jobId: String(row.jobid), active: row.active } }));
+    },
+    async bounds() {
+      const result = await client.query('SELECT min(runid)::text AS min, max(runid)::text AS max FROM unifiedcron.runs');
+      return result.rows[0];
+    },
+    async backfillFloor() {
+      const result = await client.query(`SELECT min(runid)::text AS first FROM (
+        SELECT runid FROM unifiedcron.runs WHERE start_time >= NOW() - INTERVAL '7 days' OR start_time IS NULL
+        ORDER BY runid DESC LIMIT 10000) recent`);
+      if (result.rows[0].first) return (BigInt(result.rows[0].first) - 1n).toString();
+      return (await client.query('SELECT max(runid)::text AS max FROM unifiedcron.runs')).rows[0].max || '0';
+    },
+    async page(after, limit) {
+      return (await client.query(`SELECT runid::text, jobid::text, status, start_time, end_time,
+        left(return_message, 4096) AS return_message FROM unifiedcron.runs r
+        WHERE r.runid > $1::bigint ORDER BY r.runid LIMIT $2`, [after, limit])).rows;
+    },
+    async unfinished(ids) {
+      if (!ids.length) return [];
+      return (await client.query(`SELECT runid::text, jobid::text, status, start_time, end_time,
+        left(return_message, 4096) AS return_message FROM unifiedcron.runs WHERE runid = ANY($1::bigint[])`, [ids])).rows;
+    },
+    close: () => client.end(),
+  };
 }
 
-/**
- * Validates Supabase project access
- */
-export async function validateSupabaseAccess(
-  projectUrl: string,
-  anonKey: string
-): Promise<boolean> {
-  try {
-    const response = await fetch(
-      `${projectUrl}/rest/v1/cron_jobs_view?select=count`,
-      {
-        headers: {
-          'apikey': anonKey,
-          'Authorization': `Bearer ${anonKey}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    return response.ok;
-  } catch (error) {
-    console.error('Error validating Supabase access:', error);
-    return false;
-  }
+export async function fetchSupabaseCronJobs(config: ConnectionConfig): Promise<ParsedJob[]> {
+  const source = await openSupabaseSource(config);
+  try { return await source.discover(); } finally { await source.close(); }
 }
 
-/**
- * Gets the latest run for each job to check for failures
- */
-export async function getLatestJobRuns(
-  projectUrl: string,
-  anonKey: string
-): Promise<Map<number, SupabaseCronJobRun>> {
-  try {
-    const runs = await fetchSupabaseJobRuns(projectUrl, anonKey);
-    const latestRuns = new Map<number, SupabaseCronJobRun>();
-
-    for (const run of runs) {
-      if (!latestRuns.has(run.jobid)) {
-        latestRuns.set(run.jobid, run);
-      }
-    }
-
-    return latestRuns;
-  } catch (error) {
-    console.error('Error getting latest job runs:', error);
-    throw error;
-  }
+export async function validateSupabaseAccess(config: ConnectionConfig): Promise<boolean> {
+  const source = await openSupabaseSource(config);
+  try { await source.discover(); return true; } finally { await source.close(); }
 }

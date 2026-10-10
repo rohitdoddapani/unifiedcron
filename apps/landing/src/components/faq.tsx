@@ -12,7 +12,7 @@ const faqs = [
   {
     question: "Do I need high-privilege keys?",
     answer:
-      "No. MVP uses read-only public views for Supabase and repo read tokens for GitHub. Vercel/Netlify via repo or file upload.",
+      "Supabase is the supported integration. It uses a dedicated PostgreSQL reader and private metadata views with verified TLS. Administrator access is needed to install or revoke those grants, but administrator credentials are not stored as a connection. Other providers are planned.",
   },
   {
     question: "Can I self-host?",
@@ -22,7 +22,7 @@ const faqs = [
   {
     question: "Which platforms are supported?",
     answer:
-      "Supabase, GitHub, Vercel, Netlify, and n8n. More platforms are coming soon.",
+      "Supabase pg_cron is supported today. GitHub, Vercel, Netlify and n8n integrations are planned and are not yet available in the dashboard.",
   },
   {
     question: "Do you modify my jobs?",
@@ -32,7 +32,7 @@ const faqs = [
   {
     question: "Private repos?",
     answer:
-      "Yes, via provider tokens with read scope. We only request the minimum permissions needed.",
+      "GitHub repository discovery, including private repositories, is planned. It is not currently supported.",
   },
 ];
 

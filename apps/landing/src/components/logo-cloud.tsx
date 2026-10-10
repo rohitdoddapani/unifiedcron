@@ -16,7 +16,7 @@ export function LogoCloud() {
     <section className="border-y border-zinc-200 bg-zinc-50/50 py-12 dark:border-zinc-800 dark:bg-zinc-900/50">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <p className="text-center text-sm font-medium text-zinc-500 dark:text-zinc-400">
-          Aggregate cron jobs from your favorite platforms
+          Supabase is available today. Other integrations are planned.
         </p>
         <motion.div
           className="mt-6 flex flex-wrap items-center justify-center gap-3"
@@ -37,7 +37,7 @@ export function LogoCloud() {
                 variant="outline"
                 className="cursor-default px-4 py-1.5 text-sm hover:border-emerald-300 hover:bg-emerald-50/50 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
               >
-                {platform}
+                {platform}{platform === 'Supabase' ? ' — available' : ' — planned'}
               </Badge>
             </motion.div>
           ))}

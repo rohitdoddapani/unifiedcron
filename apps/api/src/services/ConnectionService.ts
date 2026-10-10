@@ -15,7 +15,10 @@ export class ConnectionService {
 
   async getConnections(userId: string): Promise<Connection[]> {
     const result = await query(
-      'SELECT * FROM connections WHERE "userId" = $1 ORDER BY "createdAt" DESC',
+      `SELECT c.*, row_to_json(s) AS ingestion,
+        (SELECT count(*) FROM ingestion_gaps g WHERE g."connectionId"=c.id) AS "historyGaps"
+       FROM connections c LEFT JOIN ingestion_state s ON s."connectionId"=c.id AND s.stream='supabase.runs'
+       WHERE c."userId" = $1 ORDER BY c."createdAt" DESC`,
       [userId]
     );
 
@@ -38,7 +41,10 @@ export class ConnectionService {
 
   async getConnection(id: string, userId: string): Promise<Connection | null> {
     const result = await query(
-      'SELECT * FROM connections WHERE id = $1 AND "userId" = $2',
+      `SELECT c.*, row_to_json(s) AS ingestion,
+        (SELECT count(*) FROM ingestion_gaps g WHERE g."connectionId"=c.id) AS "historyGaps"
+       FROM connections c LEFT JOIN ingestion_state s ON s."connectionId"=c.id AND s.stream='supabase.runs'
+       WHERE c.id=$1 AND c."userId"=$2`,
       [id, userId]
     );
 
@@ -149,13 +155,10 @@ export class ConnectionService {
         };
       }
 
-      const supabaseResult = await integrations.validateSupabaseAccess(
-        connection.config.projectUrl!,
-        connection.config.anonKey!
-      );
+      const supabaseResult = await integrations.validateSupabaseAccess(connection.config);
       return {
         success: supabaseResult,
-        message: supabaseResult ? 'Connection successful' : 'Failed to connect to Supabase'
+        message: supabaseResult ? 'Verified TLS and least-privilege reader access' : 'Failed to connect to Supabase'
       };
     } catch (error) {
       console.error('Connection test failed:', error);
