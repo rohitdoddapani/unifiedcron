@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/smoke-lib.sh"
+
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.selfhost.yml}"
 ENV_FILE="${ENV_FILE:-.env.local}"
 SMOKE_BUILD="${SMOKE_BUILD:-true}"
@@ -69,7 +72,7 @@ wait_for_compose_health() {
   local elapsed=0
 
   while (( elapsed < timeout_seconds )); do
-    if compose ps "$service" | tail -n +2 | head -n1 | rg -q "healthy"; then
+    if compose_service_is_healthy "$service"; then
       echo "PASS ${service}-container-health"
       return 0
     fi
@@ -116,7 +119,7 @@ if [[ "$WEB_STATUS" != "200" ]]; then
   exit 1
 fi
 
-WEB_TITLE="$(rg -o '<title>[^<]+</title>' "$WEB_TMP" | head -n1 || true)"
+WEB_TITLE="$(node -e "const fs=require('fs'); const html=fs.readFileSync(process.argv[1],'utf8'); process.stdout.write((html.match(/<title>[^<]+<\/title>/)||[''])[0]);" "$WEB_TMP")"
 echo "CHECK web-title=${WEB_TITLE}"
 
 NEXTAUTH_TMP="$(mktemp)"

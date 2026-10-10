@@ -69,7 +69,7 @@ Webhook dispatch runs every 15 seconds independently of monitoring, with 1/5/15/
 and six maximum attempts. Receivers must deduplicate the stable delivery ID (at-least-once delivery).
 Worker has non-overlapping cycles, graceful shutdown, structured logs, health/metrics and database failure responses.
 
-Root `pnpm test` now builds services and runs four real Node transport/security tests.
+Root `pnpm test` builds services and runs transport/security tests plus a shell health-check regression.
 `TEST_DATABASE_URL=... pnpm test:integration` runs four real PostgreSQL suites covering ownership,
 concurrent dispatch, all backoff delays, terminal failure, eventual recovery, crashed leases,
 outbox repair and encryption compatibility. Database name must end in `_test`.
@@ -77,7 +77,7 @@ Legacy leaf-package Jest scripts are not the release gate; use the root commands
 CI includes service builds, type checks, lint, unit tests, PostgreSQL integration tests, builds and compose smoke.
 Workflow runs on main pushes and pull requests. Inspect the GitHub Actions result for the release revision; do not infer success from configuration alone.
 
-Verified: type checks/lint/builds; all four unit and four integration suites; real browser registration,
+Verified: type checks/lint/builds; transport/security unit and four integration suites; real browser registration,
 sign-in, endpoint creation, test-send and attempt history; mobile layout at 390px with no horizontal overflow.
 Migration 005 passed twice on a restored production copy, then on production.
 Production auth/isolation checks passed. Live HTTPS signed simulated failure alerts, natural one-minute retry
@@ -91,6 +91,10 @@ Rollback image tags: `unifiedcron-api:pre-m3-20261010`, `unifiedcron-web:pre-m3-
 Staging source: `/srv/unifiedcron-m3-release`; active source remains `/srv/unifiedcron`.
 Runbook: `docs/NOTIFICATIONS.md`, mirrored to `docs-site/pages/notifications.mdx`.
 Next work: user acceptance, checking release CI, and choosing post-M3 features.
+
+CI smoke portability: do not assume ripgrep is installed on runners. The smoke script uses Docker inspect
+for exact container health status and Node for HTML title extraction. `tests/smoke.unit.test.cjs` covers
+healthy versus unhealthy/starting/missing container/inspect failure cases.
 
 ### Production Deployment Verified on 2026-10-10
 
