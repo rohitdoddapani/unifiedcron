@@ -1,5 +1,5 @@
 import { query } from '@unifiedcron/database';
-import { encrypt, decrypt, maskSecret } from '@unifiedcron/shared';
+import { encrypt, decrypt } from '@unifiedcron/shared';
 import { Connection, ConnectionConfig, Platform } from '@unifiedcron/shared';
 import * as integrations from '@unifiedcron/integrations';
 
@@ -23,9 +23,9 @@ export class ConnectionService {
     const connections = await Promise.all(
       result.rows.map(async (row: Record<string, unknown>) => {
         const configData = row.config as { encrypted?: string } | string;
-        const encryptedValue = typeof configData === 'object' && configData.encrypted 
-          ? configData.encrypted 
-          : configData as string;
+        const encryptedValue = typeof configData === 'object' && configData.encrypted
+          ? configData.encrypted
+          : (configData as string);
         return {
           ...row,
           config: await this.decryptConfig(encryptedValue)
@@ -47,10 +47,10 @@ export class ConnectionService {
     }
 
     const connection = result.rows[0];
-    const configData = connection.config;
+    const configData = connection.config as { encrypted?: string } | string;
     return {
       ...connection,
-      config: await this.decryptConfig(configData.encrypted || configData)
+      config: await this.decryptConfig(configData)
     };
   }
 
@@ -166,24 +166,41 @@ export class ConnectionService {
     }
   }
 
-  private async encryptConfig(config: ConnectionConfig): Promise<any> {
+  private async encryptConfig(config: ConnectionConfig): Promise<string> {
     const configStr = JSON.stringify(config);
     return await encrypt(configStr, this.encryptionKey);
   }
 
-  private async decryptConfig(encryptedConfig: string | { encrypted: string }): Promise<ConnectionConfig> {
+  private async decryptConfig(encryptedConfig: string | { encrypted?: string }): Promise<ConnectionConfig> {
     try {
-      // Handle both old format (string) and new format (object with encrypted field)
-      const encryptedStr = typeof encryptedConfig === 'string' 
-        ? encryptedConfig 
-        : encryptedConfig.encrypted;
-      
+      const encryptedStr = this.extractEncryptedString(encryptedConfig);
       const configStr = await decrypt(encryptedStr, this.encryptionKey);
       return JSON.parse(configStr);
     } catch (error) {
       console.error('Failed to decrypt config:', error);
       return {} as ConnectionConfig;
     }
+  }
+
+  private extractEncryptedString(value: string | { encrypted?: string }): string {
+    if (typeof value === 'string') {
+      // Legacy rows can store JSON stringified object payloads.
+      try {
+        const parsed = JSON.parse(value) as { encrypted?: string };
+        if (parsed && typeof parsed.encrypted === 'string') {
+          return parsed.encrypted;
+        }
+      } catch (error) {
+        // Not a JSON payload; treat as raw encrypted text.
+      }
+      return value;
+    }
+
+    if (!value.encrypted) {
+      throw new Error('Missing encrypted payload');
+    }
+
+    return value.encrypted;
   }
 
   // Helper method to get decrypted config for internal use

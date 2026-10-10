@@ -23,6 +23,7 @@ export const ConnectionSchema = z.object({
   label: z.string(),
   config: ConnectionConfigSchema,
   createdAt: z.date(),
+  updatedAt: z.date().optional(),
 });
 
 export type Connection = z.infer<typeof ConnectionSchema>;
@@ -49,6 +50,7 @@ export type JobRunStatus = z.infer<typeof JobRunStatusSchema>;
 export const JobRunSchema = z.object({
   id: z.string().uuid(),
   jobId: z.string().uuid(),
+  sourceRunId: z.string().optional(),
   status: JobRunStatusSchema,
   startedAt: z.date(),
   endedAt: z.date().optional(),
@@ -65,6 +67,9 @@ export const AlertSchema = z.object({
   id: z.string().uuid(),
   jobId: z.string().uuid(),
   type: AlertTypeSchema,
+  sourceRunId: z.string().optional(),
+  status: z.enum(['open', 'resolved']).default('open'),
+  resolvedAt: z.date().optional(),
   createdAt: z.date(),
   details: z.record(z.any()),
 });

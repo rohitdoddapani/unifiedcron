@@ -2,7 +2,7 @@
 FROM node:20-alpine AS base
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 # Set working directory
 WORKDIR /app
@@ -50,7 +50,7 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 # Copy package files for production install
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
@@ -71,6 +71,9 @@ COPY --from=build /app/packages/integrations/dist ./packages/integrations/dist
 COPY --from=build /app/apps/worker/dist ./apps/worker/dist
 
 WORKDIR /app/apps/worker
+
+# Expose worker health endpoint
+EXPOSE 3003
 
 # Start the worker
 CMD ["node", "dist/index.js"]

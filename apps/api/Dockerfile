@@ -2,7 +2,7 @@
 FROM node:20-alpine AS base
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 # Set working directory
 WORKDIR /app
@@ -50,7 +50,7 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 # Copy package files for production install
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
@@ -66,7 +66,7 @@ RUN pnpm install --prod --frozen-lockfile
 COPY --from=build /app/packages/shared/dist ./packages/shared/dist
 COPY --from=build /app/packages/database/dist ./packages/database/dist
 COPY --from=build /app/packages/integrations/dist ./packages/integrations/dist
-COPY --from=build /app/packages/database/src/schema.sql ./packages/database/src/schema.sql
+COPY --from=build /app/packages/database/src ./packages/database/src
 
 # Copy built API
 COPY --from=build /app/apps/api/dist ./apps/api/dist

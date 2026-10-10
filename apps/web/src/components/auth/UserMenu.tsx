@@ -2,6 +2,7 @@
 
 import { signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { LogOut, User } from 'lucide-react';
 
@@ -26,9 +27,11 @@ export function UserMenu() {
     <div className="flex items-center space-x-4">
       <div className="flex items-center space-x-2">
         {session.user?.image ? (
-          <img
+          <Image
             src={session.user.image}
             alt={session.user.name || 'User'}
+            width={32}
+            height={32}
             className="h-8 w-8 rounded-full"
           />
         ) : (
@@ -49,4 +52,3 @@ export function UserMenu() {
     </div>
   );
 }
-

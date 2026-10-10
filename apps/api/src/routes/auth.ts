@@ -5,7 +5,11 @@ import jwt from 'jsonwebtoken';
 
 const router: IRouter = Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.ENCRYPTION_KEY || 'change-me-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required');
+}
+const REQUIRED_JWT_SECRET: string = JWT_SECRET as string;
 
 // Register new user
 router.post('/register', async (req, res, next) => {
@@ -40,7 +44,7 @@ router.post('/register', async (req, res, next) => {
     const user = result.rows[0];
 
     // Generate JWT token
-    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
+    const token = jwt.sign({ userId: user.id, email: user.email }, REQUIRED_JWT_SECRET, {
       expiresIn: '30d',
     });
 
@@ -101,7 +105,7 @@ router.post('/login', async (req, res, next) => {
     }
 
     // Generate JWT token
-    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
+    const token = jwt.sign({ userId: user.id, email: user.email }, REQUIRED_JWT_SECRET, {
       expiresIn: '30d',
     });
 
@@ -136,7 +140,7 @@ router.get('/me', async (req, res, next) => {
     let decoded: any;
 
     try {
-      decoded = jwt.verify(token, JWT_SECRET);
+      decoded = jwt.verify(token, REQUIRED_JWT_SECRET);
     } catch (error) {
       return res.status(401).json({
         success: false,
@@ -165,4 +169,3 @@ router.get('/me', async (req, res, next) => {
 });
 
 export { router as authRouter };
-

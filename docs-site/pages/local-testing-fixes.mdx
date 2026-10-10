@@ -25,17 +25,16 @@ This document explains what was fixed to enable local testing of the Supabase co
 - Implemented full API integration in connections page
 - Added form state management
 - Added loading states and error handling
-- Added user ID management (default user for development)
+- Added session-token based auth handling
 
-### 3. Missing User ID Management
+### 3. Missing Auth Context Propagation
 
-**Problem:** API requires userId but there was no way to get/create one.
+**Problem:** API identity was previously passed as `userId` in request params/body.
 
 **Fix:**
-- Created default user endpoint (`/api/users/default`)
-- Added user utility to get/create default user
-- Updated frontend to fetch user ID on mount
-- Updated all API calls to use the fetched user ID
+- Removed `userId` request contracts for protected routes
+- Enforced bearer-token auth on `/api/connections`, `/api/jobs`, and `/api/alerts`
+- Updated frontend API client to use session-issued JWT access tokens
 
 ## How to Test
 
@@ -122,12 +121,10 @@ This document explains what was fixed to enable local testing of the Supabase co
    - Look at terminal where `pnpm dev` is running
    - Check for error messages
 
-4. **Test API directly:**
+4. **Test API directly (authenticated endpoint):**
    ```bash
-   # Get default user ID
-   curl http://localhost:3001/api/users/default
-   
-   # Should return: {"success":true,"userId":"...",...}
+   curl http://localhost:3001/api/users/me \
+     -H "Authorization: Bearer <jwt-token>"
    ```
 
 ### Common Error Messages
@@ -137,10 +134,10 @@ This document explains what was fixed to enable local testing of the Supabase co
 - Check port 3001 is accessible
 - Restart API server
 
-**"User ID not available"**
-- API endpoint `/api/users/default` failed
-- Check API logs for errors
-- Verify database connection
+**"Authentication required"**
+- Session token is missing or expired
+- Sign in again at `/auth/signin`
+- Verify `JWT_SECRET` is set in `.env.local`
 
 **"Failed to create connection"**
 - Check API logs for detailed error
@@ -156,10 +153,9 @@ This document explains what was fixed to enable local testing of the Supabase co
 
 - `apps/web/src/lib/api.ts` - New API client
 - `apps/web/src/app/connections/page.tsx` - Full API integration
-- `apps/api/src/routes/users.ts` - Default user endpoint
-- `apps/api/src/utils/user.ts` - User utility functions
+- `apps/api/src/routes/users.ts` - Authenticated user profile endpoint
 - `apps/api/src/index.ts` - Better env loading
-- `packages/database/src/migrate.ts` - Always create default user
+- `packages/database/src/migrate.ts` - Ordered migration framework with compatibility support
 
 ## Next Steps
 

@@ -9,5 +9,6 @@
   "docker-setup": "Docker Setup",
   "development": "Development",
   "local-testing-fixes": "Local Testing Fixes",
-  "troubleshooting": "Troubleshooting"
+  "troubleshooting": "Troubleshooting",
+  "notifications": "Webhook Notifications"
 }

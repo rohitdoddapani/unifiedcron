@@ -38,6 +38,20 @@ if [ -f ".env.local" ]; then
         echo "   ❌ ENCRYPTION_KEY not set or using placeholder"
         ERRORS=$((ERRORS + 1))
     fi
+
+    if grep -q "JWT_SECRET=" .env.local && ! grep -q "JWT_SECRET=replace_me" .env.local; then
+        echo "   ✅ JWT_SECRET is set"
+    else
+        echo "   ❌ JWT_SECRET not set or using placeholder"
+        ERRORS=$((ERRORS + 1))
+    fi
+
+    if grep -q "NEXTAUTH_SECRET=" .env.local && ! grep -q "NEXTAUTH_SECRET=replace_me" .env.local; then
+        echo "   ✅ NEXTAUTH_SECRET is set"
+    else
+        echo "   ❌ NEXTAUTH_SECRET not set or using placeholder"
+        ERRORS=$((ERRORS + 1))
+    fi
     
     if grep -q "DATABASE_URL=" .env.local; then
         DB_URL=$(grep "DATABASE_URL=" .env.local | cut -d'=' -f2-)

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,6 @@ import {
   RefreshCw,
   Loader2,
   AlertCircle,
-  CheckCircle,
   XCircle
 } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -28,54 +27,21 @@ function JobsPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState<{ [key: string]: boolean }>({});
   const [connections, setConnections] = useState<any[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    initialize();
-  }, []);
-
-  const initialize = async () => {
+  const fetchConnections = useCallback(async () => {
     try {
-      setLoading(true);
-      setError(null);
-      
-      // Get user ID
-      const userIdValue = await api.getDefaultUserId();
-      setUserId(userIdValue);
-      
-      // Fetch connections and jobs
-      await Promise.all([
-        fetchConnections(userIdValue),
-        fetchJobs(userIdValue)
-      ]);
-    } catch (error) {
-      console.error('Failed to initialize:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load jobs');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchConnections = async (userIdParam?: string) => {
-    try {
-      const id = userIdParam || userId;
-      if (!id) return;
-      
-      const response = await api.getConnections(id);
+      const response = await api.getConnections();
       if (response.success && response.data && Array.isArray(response.data)) {
         setConnections(response.data);
       }
     } catch (error) {
       console.error('Error fetching connections:', error);
     }
-  };
+  }, []);
 
-  const fetchJobs = async (userIdParam?: string) => {
+  const fetchJobs = useCallback(async () => {
     try {
-      const id = userIdParam || userId;
-      if (!id) return;
-      
-      const response = await api.getJobs(id);
+      const response = await api.getJobs();
       if (response.success && response.data && Array.isArray(response.data)) {
         setJobs(response.data);
       } else if (!response.success) {
@@ -85,25 +51,42 @@ function JobsPageContent() {
       console.error('Error fetching jobs:', error);
       setError(error instanceof Error ? error.message : 'Failed to load jobs');
     }
-  };
+  }, []);
+
+  const initialize = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch connections and jobs
+      await Promise.all([
+        fetchConnections(),
+        fetchJobs()
+      ]);
+    } catch (error) {
+      console.error('Failed to initialize:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load jobs');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchConnections, fetchJobs]);
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
 
   const handleDiscoverJobs = async (connectionId: string) => {
-    if (!userId) {
-      alert('User ID not available. Please refresh the page.');
-      return;
-    }
-
     try {
       setRefreshing(prev => ({ ...prev, [connectionId]: true }));
-      
-      const response = await api.refreshJobs(connectionId, userId);
+
+      const response = await api.refreshJobs(connectionId);
       if (response.success && response.data) {
         const { added, updated, errors } = response.data as { added: number; updated: number; errors: string[] };
         const message = `✅ Discovered ${added} new job(s) and updated ${updated} existing job(s)`;
         alert(errors.length > 0 ? `${message}\n\nErrors: ${errors.join(', ')}` : message);
-        
+
         // Refresh jobs list
-        await fetchJobs(userId);
+        await fetchJobs();
       } else {
         alert(`❌ Failed to discover jobs: ${response.error}`);
       }
@@ -179,7 +162,7 @@ function JobsPageContent() {
             <div>
               <h3 className="font-medium text-blue-900 mb-1">How to Discover Jobs</h3>
               <p className="text-sm text-blue-700">
-                Jobs are discovered from your Supabase connections. Go to the Connections page and click "Discover Jobs" on any connection to fetch cron jobs from that database.
+                Jobs are discovered from your Supabase connections. Go to the Connections page and click &quot;Discover Jobs&quot; on any connection to fetch cron jobs from that database.
               </p>
             </div>
           </div>

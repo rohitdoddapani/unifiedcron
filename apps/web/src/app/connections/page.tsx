@@ -1,18 +1,16 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
   Plus,
   Database,
-  Settings,
   Trash2,
   TestTube,
   AlertCircle,
   Loader2,
-  CheckCircle,
   XCircle,
   RefreshCw
 } from 'lucide-react';
@@ -37,7 +35,6 @@ function ConnectionsPageContent() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
   const [discoveringJobs, setDiscoveringJobs] = useState<{ [key: string]: boolean }>({});
   
   // Form state
@@ -47,45 +44,10 @@ function ConnectionsPageContent() {
     anonKey: ''
   });
 
-  useEffect(() => {
-    initialize();
-  }, []);
-
-  const initialize = async () => {
+  const fetchConnections = useCallback(async () => {
     try {
       setLoading(true);
-      setError(null);
-      
-      // First check if API is healthy
-      const healthCheck = await api.health();
-      if (!healthCheck.success) {
-        throw new Error('API health check failed');
-      }
-      
-      // Get default user ID first
-      const userIdValue = await api.getDefaultUserId();
-      setUserId(userIdValue);
-      
-      // Then fetch connections
-      await fetchConnections(userIdValue);
-    } catch (error) {
-      console.error('Failed to initialize:', error);
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : 'Failed to connect to API. Please make sure the API server is running on port 3001.';
-      setError(errorMessage);
-      setLoading(false);
-    }
-  };
-
-  const fetchConnections = async (userIdParam?: string) => {
-    try {
-      setLoading(true);
-      const id = userIdParam || userId;
-      if (!id) {
-        throw new Error('User ID not available');
-      }
-      const response = await api.getConnections(id);
+      const response = await api.getConnections();
       if (response.success && response.data && Array.isArray(response.data)) {
         setConnections(response.data);
       } else if (response.success) {
@@ -100,27 +62,41 @@ function ConnectionsPageContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const initialize = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // First check if API is healthy
+      const healthCheck = await api.health();
+      if (!healthCheck.success) {
+        throw new Error('API health check failed');
+      }
+
+      await fetchConnections();
+    } catch (error) {
+      console.error('Failed to initialize:', error);
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to connect to API. Please make sure the API server is running on port 3001.';
+      setError(errorMessage);
+      setLoading(false);
+    }
+  }, [fetchConnections]);
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
 
   const handleDeleteConnection = async (connectionId: string) => {
     if (!confirm('Are you sure you want to delete this connection?')) {
       return;
     }
 
-    // Ensure we have a user ID
-    let currentUserId = userId;
-    if (!currentUserId) {
-      try {
-        currentUserId = await api.getDefaultUserId();
-        setUserId(currentUserId);
-      } catch (error) {
-        alert('Failed to get user ID. Please refresh the page.');
-        return;
-      }
-    }
-
     try {
-      const response = await api.deleteConnection(connectionId, currentUserId);
+      const response = await api.deleteConnection(connectionId);
       if (response.success) {
         setConnections(connections.filter(c => c.id !== connectionId));
       } else {
@@ -133,20 +109,8 @@ function ConnectionsPageContent() {
   };
 
   const handleTestConnection = async (connectionId: string) => {
-    // Ensure we have a user ID
-    let currentUserId = userId;
-    if (!currentUserId) {
-      try {
-        currentUserId = await api.getDefaultUserId();
-        setUserId(currentUserId);
-      } catch (error) {
-        alert('Failed to get user ID. Please refresh the page.');
-        return;
-      }
-    }
-
     try {
-      const response = await api.testConnection(connectionId, currentUserId);
+      const response = await api.testConnection(connectionId);
       if (response.success) {
         const result = response.data as { success: boolean; message: string };
         if (result?.success) {
@@ -164,22 +128,10 @@ function ConnectionsPageContent() {
   };
 
   const handleDiscoverJobs = async (connectionId: string) => {
-    // Ensure we have a user ID
-    let currentUserId = userId;
-    if (!currentUserId) {
-      try {
-        currentUserId = await api.getDefaultUserId();
-        setUserId(currentUserId);
-      } catch (error) {
-        alert('Failed to get user ID. Please refresh the page.');
-        return;
-      }
-    }
-
     try {
       setDiscoveringJobs(prev => ({ ...prev, [connectionId]: true }));
       
-      const response = await api.refreshJobs(connectionId, currentUserId);
+      const response = await api.refreshJobs(connectionId);
       if (response.success && response.data) {
         const { added, updated, errors } = response.data as { added: number; updated: number; errors: string[] };
         const message = `✅ Discovered ${added} new job(s) and updated ${updated} existing job(s)`;
@@ -207,23 +159,9 @@ function ConnectionsPageContent() {
     setError(null);
     setSubmitting(true);
 
-    // Ensure we have a user ID
-    let currentUserId = userId;
-    if (!currentUserId) {
-      try {
-        currentUserId = await api.getDefaultUserId();
-        setUserId(currentUserId);
-      } catch (error) {
-        setError(error instanceof Error ? error.message : 'Failed to get user ID. Please refresh the page.');
-        setSubmitting(false);
-        return;
-      }
-    }
-
     try {
       // Create the connection
       const response = await api.createConnection({
-        userId: currentUserId,
         platform: 'supabase',
         label: formData.label,
         config: {
@@ -234,7 +172,7 @@ function ConnectionsPageContent() {
 
       if (response.success) {
         // Connection created successfully
-        await fetchConnections(currentUserId); // Refresh the list
+        await fetchConnections(); // Refresh the list
         setShowAddForm(false);
         setFormData({ label: '', projectUrl: '', anonKey: '' });
         setError(null);

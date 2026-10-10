@@ -1,17 +1,27 @@
 import { Router, IRouter } from 'express';
-import { getDefaultUserId } from '../utils/user';
+import { query } from '@unifiedcron/database';
+import { AuthRequest } from '../middleware/auth';
 
 const router: IRouter = Router();
 
-// Get or create default user (for development/MVP)
-router.get('/default', async (req, res, next) => {
+router.get('/me', async (req, res, next) => {
   try {
-    const userId = await getDefaultUserId();
+    const userId = (req as AuthRequest).userId!;
+    const result = await query(
+      'SELECT id, email, name, "emailVerified", image, "createdAt" FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
     res.json({
       success: true,
-      userId,
-      email: 'admin@unifiedcron.com',
-      name: 'Development Admin'
+      data: result.rows[0],
     });
   } catch (error) {
     next(error);

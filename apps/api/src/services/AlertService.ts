@@ -1,12 +1,21 @@
 import { query } from '@unifiedcron/database';
 import { Alert, AlertType } from '@unifiedcron/shared';
 
+type ResolutionSource = 'manual' | 'auto_success';
+
+interface ResolutionMetadata {
+  source?: ResolutionSource;
+  reason?: string;
+  resolvedByUserId?: string;
+  sourceRunId?: string;
+}
+
 export class AlertService {
   async getAlerts(
     userId: string,
-    options: { type?: string; limit?: number; offset?: number } = {}
+    options: { type?: string; status?: string; limit?: number; offset?: number } = {}
   ): Promise<Alert[]> {
-    const { type, limit = 50, offset = 0 } = options;
+    const { type, status, limit = 50, offset = 0 } = options;
 
     let queryStr = `
       SELECT a.*, j.name as "jobName", j.platform, j.project, c.label as "connectionLabel"
@@ -23,6 +32,12 @@ export class AlertService {
       paramCount++;
       queryStr += ` AND a.type = $${paramCount}`;
       params.push(type);
+    }
+
+    if (status) {
+      paramCount++;
+      queryStr += ` AND a.status = $${paramCount}`;
+      params.push(status);
     }
 
     queryStr += ` ORDER BY a."createdAt" DESC LIMIT $${++paramCount} OFFSET $${++paramCount}`;
@@ -45,23 +60,50 @@ export class AlertService {
     return result.rows.length > 0 ? result.rows[0] : null;
   }
 
-  async resolveAlert(id: string, userId: string): Promise<Alert | null> {
+  async resolveAlert(id: string, userId: string, resolution: ResolutionMetadata = {}): Promise<Alert | null> {
     // Verify user owns the alert
     const alert = await this.getAlert(id, userId);
     if (!alert) {
       return null;
     }
 
+    if (alert.status === 'resolved') {
+      return alert;
+    }
+
+    const resolvedAt = new Date().toISOString();
+    const source: ResolutionSource = resolution.source || 'manual';
+    const reason = resolution.reason?.trim() || (
+      source === 'manual'
+        ? 'Resolved manually from dashboard.'
+        : 'Automatically resolved after a subsequent successful run.'
+    );
+    const resolutionDetails: Record<string, unknown> = {
+      resolved: true,
+      resolvedAt,
+      resolution: {
+        source,
+        reason,
+        ...(resolution.resolvedByUserId ? { resolvedByUserId: resolution.resolvedByUserId } : {}),
+        ...(resolution.sourceRunId ? { sourceRunId: resolution.sourceRunId } : {}),
+      },
+      ...(source === 'auto_success' ? { autoResolvedAt: resolvedAt } : {}),
+    };
+
     // Update alert with resolution details
     const result = await query(
       `UPDATE alerts 
-       SET details = details || $1, "updatedAt" = NOW()
+       SET status = 'resolved',
+           "resolvedAt" = NOW(),
+           details = details || $1,
+           "updatedAt" = NOW()
        WHERE id = $2
+         AND status = 'open'
        RETURNING *`,
-      [JSON.stringify({ resolved: true, resolvedAt: new Date().toISOString() }), id]
+      [JSON.stringify(resolutionDetails), id]
     );
 
-    return result.rows.length > 0 ? result.rows[0] : null;
+    return result.rows.length > 0 ? result.rows[0] : alert;
   }
 
   async getAlertStats(userId: string): Promise<any> {
@@ -69,7 +111,8 @@ export class AlertService {
       `SELECT 
          COUNT(*) as "totalAlerts",
          COUNT(CASE WHEN a.type = 'failure' THEN 1 END) as "failureAlerts",
-         COUNT(CASE WHEN a.details->>'resolved' = 'true' THEN 1 END) as "resolvedAlerts",
+         COUNT(CASE WHEN a.status = 'resolved' THEN 1 END) as "resolvedAlerts",
+         COUNT(CASE WHEN a.status = 'open' THEN 1 END) as "openAlerts",
          COUNT(CASE WHEN a."createdAt" > NOW() - INTERVAL '24 hours' THEN 1 END) as "recentAlerts",
          COUNT(CASE WHEN a."createdAt" > NOW() - INTERVAL '7 days' THEN 1 END) as "weeklyAlerts"
        FROM alerts a
@@ -85,13 +128,19 @@ export class AlertService {
   async createAlert(data: {
     jobId: string;
     type: AlertType;
+    sourceRunId?: string;
     details: any;
   }): Promise<Alert> {
+    const existing = await this.getAlertBySourceRun(data.jobId, data.type, data.sourceRunId);
+    if (existing) {
+      return existing;
+    }
+
     const result = await query(
-      `INSERT INTO alerts ("jobId", type, details)
-       VALUES ($1, $2, $3)
+      `INSERT INTO alerts ("jobId", type, "sourceRunId", status, details)
+       VALUES ($1, $2, $3, 'open', $4)
        RETURNING *`,
-      [data.jobId, data.type, JSON.stringify(data.details)]
+      [data.jobId, data.type, data.sourceRunId || null, JSON.stringify(data.details)]
     );
 
     return result.rows[0];
@@ -123,5 +172,23 @@ export class AlertService {
     );
 
     return parseInt(result.rows[0].count) > 0;
+  }
+
+  async getAlertBySourceRun(jobId: string, type: AlertType, sourceRunId?: string): Promise<Alert | null> {
+    if (!sourceRunId) {
+      return null;
+    }
+
+    const result = await query(
+      `SELECT *
+       FROM alerts
+       WHERE "jobId" = $1
+         AND type = $2
+         AND "sourceRunId" = $3
+       LIMIT 1`,
+      [jobId, type, sourceRunId]
+    );
+
+    return result.rows.length > 0 ? result.rows[0] : null;
   }
 }

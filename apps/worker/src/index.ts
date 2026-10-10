@@ -1,64 +1,87 @@
 import dotenv from 'dotenv';
 import cron from 'node-cron';
-import { closePool } from '@unifiedcron/database';
+import http from 'http';
+import { closePool, query } from '@unifiedcron/database';
+import { logEvent } from '@unifiedcron/shared';
 import { MonitoringService } from './services/MonitoringService';
+import { NotificationService } from './services/NotificationService';
 
-// Load environment variables
 dotenv.config();
+const disabled = process.env.DISABLE_MONITORING === 'true';
+const port = Number(process.env.WORKER_PORT || 3003);
+const monitoring = new MonitoringService();
+const notifications = new NotificationService();
+let monitoringRunning = false;
+let dispatchRunning = false;
+let dispatchStatus = 'idle';
+let lastDispatchAt: string | null = null;
+let stopping = false;
 
-const DISABLE_MONITORING = process.env.DISABLE_MONITORING === 'true';
-const monitoringService = new MonitoringService();
-
-console.log('🚀 UnifiedCron Worker starting...');
-
-if (DISABLE_MONITORING) {
-  console.log('⚠️  Monitoring is disabled (DISABLE_MONITORING=true)');
-  console.log('📝 Discovery-only mode: Jobs can be discovered but monitoring is disabled');
-  console.log('💡 Monitoring features will be enabled in a future release');
-} else {
-  // Schedule monitoring tasks
-  // Run every 5 minutes
-  cron.schedule('*/5 * * * *', async () => {
-    console.log('🔄 Starting monitoring cycle...');
-    try {
-      await monitoringService.monitorSupabaseJobs();
-      console.log('✅ Monitoring cycle completed');
-    } catch (error) {
-      console.error('❌ Monitoring cycle failed:', error);
-    }
-  });
-
-  // Cleanup old data daily at 2 AM
-  cron.schedule('0 2 * * *', async () => {
-    console.log('🧹 Starting cleanup cycle...');
-    try {
-      await monitoringService.cleanupOldData();
-      console.log('✅ Cleanup cycle completed');
-    } catch (error) {
-      console.error('❌ Cleanup cycle failed:', error);
-    }
-  });
-
-  console.log('📊 Monitoring Supabase jobs every 5 minutes');
-  console.log('🧹 Cleanup scheduled daily at 2 AM');
+async function monitor() {
+  if (stopping || disabled || monitoringRunning) return;
+  monitoringRunning = true;
+  const started = Date.now();
+  try {
+    await monitoring.monitorSupabaseJobs();
+    logEvent('info', 'monitoring.cycle', { durationMs: Date.now() - started, snapshot: await monitoring.getHealthSnapshot() });
+  } catch (error) {
+    logEvent('error', 'monitoring.failed', { name: error instanceof Error ? error.name : 'Error' });
+  } finally { monitoringRunning = false; }
 }
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, shutting down gracefully');
+async function dispatch() {
+  if (stopping || dispatchRunning) return;
+  dispatchRunning = true;
+  lastDispatchAt = new Date().toISOString();
+  try {
+    await notifications.reconcileAlerts();
+    await notifications.processPendingDeliveries();
+    dispatchStatus = 'success';
+  } catch (error) {
+    dispatchStatus = 'error';
+    logEvent('error', 'webhook.dispatch_failed', { name: error instanceof Error ? error.name : 'Error' });
+  } finally { dispatchRunning = false; }
+}
+
+const monitorTask = cron.schedule('*/5 * * * *', monitor);
+const cleanupTask = cron.schedule('0 2 * * *', async () => {
+  if (!disabled && !stopping) {
+    try { await monitoring.cleanupOldData(); }
+    catch { logEvent('error', 'monitoring.cleanup_failed'); }
+  }
+});
+const dispatchTimer = setInterval(dispatch, 15_000);
+void monitor();
+void dispatch();
+
+const healthServer = http.createServer(async (req, res) => {
+  if (req.url !== '/health' && req.url !== '/metrics') {
+    res.writeHead(404); res.end(); return;
+  }
+  try {
+    await query('SELECT 1');
+    const snapshot = await monitoring.getHealthSnapshot();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok', monitoringDisabled: disabled, snapshot,
+      dispatch: { status: dispatchStatus, lastRunAt: lastDispatchAt, running: dispatchRunning }, timestamp: new Date().toISOString() }));
+  } catch {
+    res.writeHead(503, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'error', database: 'unavailable' }));
+  }
+});
+healthServer.listen(port, () => logEvent('info', 'worker.started', { port, monitoringDisabled: disabled, dispatchIntervalSeconds: 15 }));
+
+async function shutdown() {
+  if (stopping) return;
+  stopping = true;
+  monitorTask.stop(); cleanupTask.stop(); clearInterval(dispatchTimer);
+  healthServer.close();
+  const deadline = Date.now() + 90_000;
+  while ((dispatchRunning || monitoringRunning) && Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
   await closePool();
   process.exit(0);
-});
-
-process.on('SIGINT', async () => {
-  console.log('SIGINT received, shutting down gracefully');
-  await closePool();
-  process.exit(0);
-});
-
-console.log('✅ Worker started successfully');
-console.log('📊 Monitoring Supabase jobs every 5 minutes');
-console.log('🧹 Cleanup scheduled daily at 2 AM');
-
-// Keep the process alive
-process.stdin.resume();
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

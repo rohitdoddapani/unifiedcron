@@ -4,9 +4,11 @@
 set -e
 
 echo "🛑 Stopping UnifiedCron..."
+COMPOSE_FILE=${COMPOSE_FILE:-docker-compose.selfhost.yml}
+echo "📄 Using compose file: ${COMPOSE_FILE}"
 
 # Stop Docker Compose services
-docker compose down
+docker compose -f "$COMPOSE_FILE" down
 
 echo "✅ UnifiedCron stopped successfully"
 

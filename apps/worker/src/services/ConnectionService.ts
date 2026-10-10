@@ -1,6 +1,6 @@
 import { query } from '@unifiedcron/database';
-import { encrypt, decrypt, maskSecret } from '@unifiedcron/shared';
-import { Connection, ConnectionConfig, Platform } from '@unifiedcron/shared';
+import { decrypt } from '@unifiedcron/shared';
+import { Connection, ConnectionConfig } from '@unifiedcron/shared';
 
 export class ConnectionService {
   private encryptionKey: string;
@@ -42,14 +42,34 @@ export class ConnectionService {
     return await this.decryptConfig(result.rows[0].config);
   }
 
-  private async decryptConfig(encryptedConfig: string): Promise<ConnectionConfig> {
+  private async decryptConfig(encryptedConfig: string | { encrypted?: string }): Promise<ConnectionConfig> {
     try {
-      const configStr = await decrypt(encryptedConfig, this.encryptionKey);
+      const encryptedStr = this.extractEncryptedString(encryptedConfig);
+      const configStr = await decrypt(encryptedStr, this.encryptionKey);
       return JSON.parse(configStr);
     } catch (error) {
       console.error('Failed to decrypt config:', error);
       return {} as ConnectionConfig;
     }
   }
-}
 
+  private extractEncryptedString(value: string | { encrypted?: string }): string {
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value) as { encrypted?: string };
+        if (parsed && typeof parsed.encrypted === 'string') {
+          return parsed.encrypted;
+        }
+      } catch (error) {
+        // Best effort for compatibility with raw encrypted strings.
+      }
+      return value;
+    }
+
+    if (!value.encrypted) {
+      throw new Error('Missing encrypted payload');
+    }
+
+    return value.encrypted;
+  }
+}

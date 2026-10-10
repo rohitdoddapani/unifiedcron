@@ -5,19 +5,52 @@ import GoogleProvider from 'next-auth/providers/google';
 import GitHubProvider from 'next-auth/providers/github';
 import { query } from '@unifiedcron/database';
 import bcrypt from 'bcryptjs';
+import { createHmac } from 'crypto';
 
 // Ensure environment variables are available
 // Next.js automatically loads .env.local from the app root (apps/web/)
 const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET;
+const API_JWT_SECRET = process.env.JWT_SECRET;
 
 if (!NEXTAUTH_SECRET) {
-  console.error('❌ ERROR: NEXTAUTH_SECRET or AUTH_SECRET environment variable is required');
-  console.error('   Add NEXTAUTH_SECRET to your apps/web/.env.local file (or root .env.local)');
-  console.error('   Current env check:', {
-    hasNEXTAUTH_SECRET: !!process.env.NEXTAUTH_SECRET,
-    hasAUTH_SECRET: !!process.env.AUTH_SECRET,
-    nodeEnv: process.env.NODE_ENV,
-  });
+  throw new Error('NEXTAUTH_SECRET (or AUTH_SECRET) environment variable is required');
+}
+
+if (!API_JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required for API access tokens');
+}
+
+const REQUIRED_NEXTAUTH_SECRET: string = NEXTAUTH_SECRET as string;
+const REQUIRED_API_JWT_SECRET: string = API_JWT_SECRET as string;
+
+function toBase64Url(value: string): string {
+  return Buffer.from(value)
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
+
+function createApiAccessToken(payload: { userId: string; email?: string | null }): string {
+  const now = Math.floor(Date.now() / 1000);
+  const expiresInSeconds = 30 * 24 * 60 * 60;
+  const header = toBase64Url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const body = toBase64Url(
+    JSON.stringify({
+      userId: payload.userId,
+      email: payload.email || '',
+      iat: now,
+      exp: now + expiresInSeconds,
+    })
+  );
+  const secureSignature = createHmac('sha256', REQUIRED_API_JWT_SECRET)
+    .update(`${header}.${body}`)
+    .digest('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+
+  return `${header}.${body}.${secureSignature}`;
 }
 
 // Note: This adapter requires the database to have the auth schema migrated
@@ -253,19 +286,23 @@ export const authOptions: NextAuthConfig = {
   callbacks: {
     async jwt({ token, user }) {
       // When user signs in, add user ID to the token
-      if (user) {
-        token.id = user.id;
+      if (user?.id) {
+        (token as any).id = user.id;
+        (token as any).accessToken = createApiAccessToken({
+          userId: user.id as string,
+          email: user.email,
+        });
       }
       return token;
     },
     async session({ session, token }) {
       // Add user ID from token to session
-      if (session.user && token.id) {
-        session.user.id = token.id as string;
+      if (session.user && (token as any).id) {
+        session.user.id = (token as any).id as string;
       }
+      (session as any).accessToken = (token as any).accessToken;
       return session;
     },
   },
-  secret: NEXTAUTH_SECRET || 'development-secret-change-in-production',
+  secret: REQUIRED_NEXTAUTH_SECRET,
 };
-

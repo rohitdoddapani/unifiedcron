@@ -17,18 +17,24 @@
     "dev:api": "pnpm --filter api dev",
     "dev:worker": "pnpm --filter worker dev",
     "dev:landing": "pnpm --filter @unifiedcron/landing dev",
-    "build": "pnpm --filter web build && pnpm --filter api build",
+    "build": "pnpm --filter @unifiedcron/shared build && pnpm --filter @unifiedcron/database build && pnpm --filter @unifiedcron/integrations build && pnpm --filter web build && pnpm --filter api build && pnpm --filter worker build",
     "start": "pnpm --filter api start",
-    "test": "pnpm --filter web test && pnpm --filter api test",
-    "lint": "pnpm --filter web lint && pnpm --filter api lint",
-    "type-check": "pnpm --filter web type-check && pnpm --filter api type-check"
+    "test": "pnpm build:services && pnpm test:unit",
+    "test:ci": "pnpm build:services && pnpm type-check && pnpm lint && pnpm test:unit && pnpm test:integration",
+    "lint": "pnpm --filter web lint && pnpm --filter api lint && pnpm --filter worker lint",
+    "type-check": "pnpm --filter web type-check && pnpm --filter api type-check && pnpm --filter worker type-check",
+    "db:migrate": "pnpm --filter @unifiedcron/shared build && pnpm --filter @unifiedcron/database build && pnpm --filter @unifiedcron/database migrate",
+    "smoke:compose": "scripts/smoke-compose.sh",
+    "build:services": "pnpm --filter @unifiedcron/shared build && pnpm --filter @unifiedcron/database build && pnpm --filter @unifiedcron/integrations build && pnpm --filter api build && pnpm --filter worker build",
+    "test:unit": "node --test tests/*.unit.test.cjs",
+    "test:integration": "node --test tests/*.integration.test.cjs"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
     "typescript": "^5.3.3"
   },
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=20.0.0",
     "pnpm": ">=8.0.0"
   }
 }

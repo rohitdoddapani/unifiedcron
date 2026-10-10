@@ -1,6 +1,6 @@
 import { Router, IRouter } from 'express';
 import { ConnectionService } from '../services/ConnectionService';
-import { Platform, ConnectionConfig } from '@unifiedcron/shared';
+import { AuthRequest } from '../middleware/auth';
 
 const router: IRouter = Router();
 
@@ -17,13 +17,7 @@ function getConnectionService(): ConnectionService {
 // Get all connections for a user
 router.get('/', async (req, res, next) => {
   try {
-    const userId = req.query.userId as string;
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'userId is required'
-      });
-    }
+    const userId = (req as AuthRequest).userId!;
 
     const connections = await getConnectionService().getConnections(userId);
     res.json({
@@ -39,7 +33,7 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const userId = req.query.userId as string;
+    const userId = (req as AuthRequest).userId!;
 
     const connection = await getConnectionService().getConnection(id, userId);
     if (!connection) {
@@ -61,12 +55,13 @@ router.get('/:id', async (req, res, next) => {
 // Create a new connection
 router.post('/', async (req, res, next) => {
   try {
-    const { userId, platform, label, config } = req.body;
+    const userId = (req as AuthRequest).userId!;
+    const { platform, label, config } = req.body;
 
-    if (!userId || !platform || !label || !config) {
+    if (!platform || !label || !config) {
       return res.status(400).json({
         success: false,
-        error: 'userId, platform, label, and config are required'
+        error: 'platform, label, and config are required'
       });
     }
 
@@ -98,14 +93,8 @@ router.post('/', async (req, res, next) => {
 router.put('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { userId, label, config } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'userId is required'
-      });
-    }
+    const userId = (req as AuthRequest).userId!;
+    const { label, config } = req.body;
 
     const connection = await getConnectionService().updateConnection(id, userId, {
       label,
@@ -132,14 +121,7 @@ router.put('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const userId = req.query.userId as string;
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'userId is required'
-      });
-    }
+    const userId = (req as AuthRequest).userId!;
 
     const deleted = await getConnectionService().deleteConnection(id, userId);
     if (!deleted) {
@@ -162,14 +144,7 @@ router.delete('/:id', async (req, res, next) => {
 router.post('/:id/test', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const userId = req.query.userId as string;
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'userId is required'
-      });
-    }
+    const userId = (req as AuthRequest).userId!;
 
     const result = await getConnectionService().testConnection(id, userId);
     

@@ -2,7 +2,7 @@
 FROM node:20-alpine AS base
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 # Set working directory
 WORKDIR /app
@@ -43,7 +43,7 @@ RUN pnpm build
 WORKDIR /app/apps/web
 # Create public folder if it doesn't exist
 RUN mkdir -p public
-RUN pnpm build
+RUN NEXTAUTH_SECRET=build-only-placeholder JWT_SECRET=build-only-placeholder pnpm build
 
 # Production stage
 FROM node:20-alpine AS runner

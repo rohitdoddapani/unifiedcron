@@ -4,7 +4,7 @@ This guide will help you set up and develop UnifiedCron locally.
 
 ## Prerequisites
 
-- Node.js 18+ 
+- Node.js 20+
 - pnpm (recommended) or npm
 - PostgreSQL database
 - Git
@@ -111,6 +111,12 @@ pnpm db:migrate
 
 ## API Endpoints
 
+### Authentication
+- `POST /api/auth/register` - Register user
+- `POST /api/auth/login` - Login user
+- `GET /api/auth/me` - Get current user from bearer token
+- `GET /api/users/me` - Get authenticated user profile
+
 ### Connections
 - `GET /api/connections` - List connections
 - `POST /api/connections` - Create connection
@@ -127,10 +133,22 @@ pnpm db:migrate
 - `GET /api/jobs/:id/stats` - Get job statistics
 
 ### Alerts
-- `GET /api/alerts` - List alerts
+- `GET /api/alerts` - List alerts (`status=open|resolved`, `type=failure`)
 - `GET /api/alerts/:id` - Get alert
 - `PATCH /api/alerts/:id/resolve` - Resolve alert
 - `GET /api/alerts/stats/overview` - Get alert statistics
+
+### Notifications
+- `GET /api/notifications/webhooks` - List webhook endpoints
+- `POST /api/notifications/webhooks` - Create webhook endpoint
+- `PATCH /api/notifications/webhooks/:id` - Edit or pause endpoint; rotate signing secret
+- `DELETE /api/notifications/webhooks/:id` - Delete webhook endpoint
+- `POST /api/notifications/webhooks/:id/test` - Queue test event (HTTP 202)
+- `GET /api/notifications/deliveries` - Filtered, paginated delivery history
+- `GET /api/notifications/deliveries/:id` - Delivery detail and attempt history
+- `GET /api/notifications/metrics` - Current user's delivery status counts
+
+See [Webhook Notifications](./notifications) for signing verification, retries and destination policy.
 
 ## Database Schema
 
@@ -140,6 +158,9 @@ pnpm db:migrate
 - `jobs` - Normalized cron jobs
 - `jobRuns` - Job execution history
 - `alerts` - Failure alerts and notifications
+- `notification_endpoints` - Webhook endpoint configuration
+- `notification_deliveries` - Webhook delivery attempts and retries
+- `notification_delivery_attempts` - Per-attempt outcomes and lease recovery history
 
 ### Views
 - `job_details` - Jobs with connection and statistics
@@ -153,11 +174,20 @@ pnpm db:migrate
 
 ## Monitoring
 
-The background worker runs every 5 minutes to:
-1. Check Supabase job runs for failures
-2. Create alerts for failed jobs
-3. Clean up old data
-4. Update job statistics
+The background worker runs every 5 minutes and:
+1. Ingests latest Supabase runs using deterministic `sourceRunId` (`supabase:<jobId>:<start_time>`)
+2. Upserts `jobRuns` idempotently (no duplicate run rows for the same run identity)
+3. Creates failure alerts idempotently keyed by failed run identity
+4. Auto-resolves open alerts when a subsequent run succeeds (with resolution metadata)
+5. Queues webhook deliveries for new failure alerts
+
+Webhook dispatch runs independently every 15 seconds, including when monitoring is disabled.
+Database leases prevent concurrent claims; retries use 1/5/15/30/60-minute backoff.
+The sixth unsuccessful attempt is terminal. An outbox repair step recovers missed enqueue operations.
+
+Worker observability endpoints:
+- `GET http://localhost:3003/health`
+- `GET http://localhost:3003/metrics`
 
 ## Contributing
 

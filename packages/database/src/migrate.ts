@@ -1,5 +1,5 @@
 import { Client } from 'pg';
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { config } from 'dotenv';
 import { resolve } from 'path';
@@ -53,6 +53,72 @@ async function checkSchemaExists(client: Client): Promise<boolean> {
   }
 }
 
+async function ensureMigrationsTable(client: Client): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL UNIQUE,
+      "appliedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
+async function getAppliedMigrationNames(client: Client): Promise<Set<string>> {
+  const result = await client.query('SELECT name FROM schema_migrations');
+  return new Set(result.rows.map((row: { name: string }) => row.name));
+}
+
+async function applyMigration(client: Client, migrationName: string, sql: string): Promise<void> {
+  await client.query('BEGIN');
+  try {
+    await client.query(sql);
+    await client.query('INSERT INTO schema_migrations (name) VALUES ($1)', [migrationName]);
+    await client.query('COMMIT');
+    console.log(`✅ Applied migration: ${migrationName}`);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  }
+}
+
+async function applyOrderedMigrations(client: Client): Promise<void> {
+  const migrationsDir = join(__dirname, '../src/migrations');
+  if (!existsSync(migrationsDir)) {
+    console.log('ℹ️ Migrations directory not found, skipping ordered migrations');
+    return;
+  }
+
+  const migrationFiles = readdirSync(migrationsDir)
+    .filter((file) => file.endsWith('.sql'))
+    .sort();
+
+  if (migrationFiles.length === 0) {
+    console.log('ℹ️ No migration files found in packages/database/src/migrations');
+    return;
+  }
+
+  const applied = await getAppliedMigrationNames(client);
+  for (const file of migrationFiles) {
+    if (applied.has(file)) {
+      continue;
+    }
+
+    const sql = readFileSync(join(migrationsDir, file), 'utf8');
+    await applyMigration(client, file, sql);
+  }
+}
+
+async function applyBaseSchemas(client: Client): Promise<void> {
+  const schemaPath = join(__dirname, '../src/schema.sql');
+  const authSchemaPath = join(__dirname, '../src/auth-schema.sql');
+
+  const schema = readFileSync(schemaPath, 'utf8');
+  await client.query(schema);
+
+  const authSchema = readFileSync(authSchemaPath, 'utf8');
+  await client.query(authSchema);
+}
+
 async function migrate() {
   const connectionString = process.env.DATABASE_URL || 'postgres://user:pass@localhost:5432/unifiedcron';
   let client: Client | null = null;
@@ -61,46 +127,23 @@ async function migrate() {
     // Wait for database to be ready (important for Docker Compose)
     client = await waitForDatabase(connectionString);
 
-    // Check if schema already exists
     const schemaExists = await checkSchemaExists(client);
-    if (schemaExists) {
-      console.log('📊 Database schema already exists, skipping migration');
-      return;
-    }
-
-    console.log('📦 Creating database schema...');
-
-    // Read and execute schema
-    // When running from dist/, go up to src/ to find schema.sql
-    const schemaPath = join(__dirname, '../src/schema.sql');
-    const schema = readFileSync(schemaPath, 'utf8');
-    
-    await client.query(schema);
-    console.log('✅ Database schema created successfully');
-
-    // Create a default user for development (always create if doesn't exist)
-    const defaultUser = {
-      email: 'admin@unifiedcron.com',
-      name: 'Development Admin'
-    };
-
-    const userResult = await client.query(
-      'INSERT INTO users (email, name) VALUES ($1, $2) ON CONFLICT (email) DO NOTHING RETURNING id',
-      [defaultUser.email, defaultUser.name]
-    );
-
-    if (userResult.rows.length > 0) {
-      console.log('✅ Default user created:', userResult.rows[0].id);
+    if (!schemaExists) {
+      console.log('📦 Creating initial database schema...');
     } else {
-      // User already exists, get the ID
-      const existingUser = await client.query(
-        'SELECT id FROM users WHERE email = $1',
-        [defaultUser.email]
-      );
-      if (existingUser.rows.length > 0) {
-        console.log('✅ Using existing default user:', existingUser.rows[0].id);
-      }
+      console.log('📦 Ensuring schema and migrations are up to date...');
     }
+
+    // Existing schemas need additive columns before the current base indexes.
+    if (!schemaExists) {
+      await applyBaseSchemas(client);
+    }
+    await ensureMigrationsTable(client);
+    await applyOrderedMigrations(client);
+    if (schemaExists) {
+      await applyBaseSchemas(client);
+    }
+    console.log('✅ Database migration completed successfully');
 
   } catch (error) {
     console.error('❌ Migration failed:', error);

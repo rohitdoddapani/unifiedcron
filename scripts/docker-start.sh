@@ -4,6 +4,8 @@
 set -e
 
 echo "🚀 Starting UnifiedCron..."
+COMPOSE_FILE=${COMPOSE_FILE:-docker-compose.selfhost.yml}
+echo "📄 Using compose file: ${COMPOSE_FILE}"
 
 # Check if .env file exists
 if [ ! -f ".env" ]; then
@@ -36,7 +38,7 @@ fi
 
 # Start Docker Compose
 echo "🐳 Starting Docker Compose services..."
-docker compose up -d
+docker compose -f "$COMPOSE_FILE" up -d
 
 # Wait for services to be healthy
 echo "⏳ Waiting for services to be healthy..."
@@ -62,7 +64,7 @@ fi
 # Display status
 echo ""
 echo "📊 Service Status:"
-docker compose ps
+docker compose -f "$COMPOSE_FILE" ps
 
 echo ""
 echo "🎉 UnifiedCron is starting up!"

@@ -1,4 +1,5 @@
 import { Client, Pool, PoolClient } from 'pg';
+import { logEvent } from '@unifiedcron/shared';
 
 let pool: Pool | null = null;
 
@@ -12,7 +13,7 @@ export function getPool(): Pool {
     });
 
     pool.on('error', (err) => {
-      console.error('Unexpected error on idle client', err);
+      logEvent('error', 'database.pool_error', { name: err.name });
       process.exit(-1);
     });
   }
@@ -32,10 +33,10 @@ export async function query(text: string, params?: any[]): Promise<any> {
   try {
     const res = await pool.query(text, params);
     const duration = Date.now() - start;
-    console.log('Executed query', { text: text.substring(0, 100), duration, rows: res.rowCount });
+    logEvent('info', 'database.query', { durationMs: duration, rows: res.rowCount });
     return res;
   } catch (error) {
-    console.error('Database query error:', error);
+    logEvent('error', 'database.query_failed', { name: error instanceof Error ? error.name : 'Error' });
     throw error;
   }
 }

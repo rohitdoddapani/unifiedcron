@@ -8,11 +8,11 @@ UnifiedCron is a self-hostable developer tool that centralizes cron jobs into on
 - **Supabase Support**: Discover and monitor pg_cron jobs from your Supabase databases
 - **Unified Dashboard**: View all your scheduled jobs in one place
 - **Secure**: Encrypted credential storage with read-only access patterns
-- **Discovery-First**: Focus on discovering and organizing your cron jobs (monitoring coming soon)
+- **Monitoring + Alerts**: Worker ingests run history, raises failure alerts, and supports webhook notifications
 
 ## Current Status
 
-🚧 **Beta Release** - Currently supports **Supabase only**. Other platforms (GitHub Actions, Vercel, Netlify, n8n) will be added incrementally in future releases.
+🚧 **Beta Release** - Currently supports **Supabase only**. Monitoring + in-app alerts are available for Supabase. Other platforms (GitHub Actions, Vercel, Netlify, n8n) will be added incrementally in future releases.
 
 ## Quick Start with Docker Compose (Recommended)
 
@@ -59,7 +59,7 @@ docker compose -f docker-compose.prod.yml up -d
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - pnpm or npm
 - PostgreSQL (or a local Supabase instance)
 
@@ -95,6 +95,7 @@ pnpm dev
 This will start:
 - Frontend at http://localhost:3000
 - API at http://localhost:3001
+- Worker health at http://localhost:3003/health
 
 See the Development Guide at https://docs.unifiedcron.com/development for more details.
 
@@ -124,6 +125,8 @@ See the Development Guide at https://docs.unifiedcron.com/development for more d
 - Reads from `cron.job` and `cron.job_run_details` via public views
 - Requires project URL and anonymous key
 - Discover all active cron jobs from your Supabase databases
+- Tracks run outcomes and raises failure alerts
+- Supports webhook notification endpoints for alert delivery
 - See the Supabase Setup Guide at https://docs.unifiedcron.com/supabase-setup for detailed instructions
 
 ### 🚧 Coming Soon
@@ -186,6 +189,8 @@ unifiedcron/
 MIT License - see LICENSE file for details
 
 ## Documentation
+
+- Webhook setup, signing and retry runbook: [docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md)
 
 - Docs site: https://docs.unifiedcron.com
 - Source markdown: `docs/`

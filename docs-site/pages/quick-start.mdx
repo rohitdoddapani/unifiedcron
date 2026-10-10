@@ -4,7 +4,7 @@ This guide will help you get UnifiedCron running locally for testing with Supaba
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - pnpm (or npm)
 - PostgreSQL running locally (or Docker)
 - A Supabase project (cloud or local)

@@ -55,6 +55,7 @@ docker compose version
 6. **Access the application**:
    - Frontend: http://localhost:3000
    - API: http://localhost:3001
+   - Worker health: http://localhost:3003/health
    - Health check: http://localhost:3001/health
 
 ## Environment Configuration
@@ -79,12 +80,13 @@ Edit the `.env` file with your settings:
 
 - `API_PORT`: API server port (default: `3001`)
 - `WEB_PORT`: Frontend port (default: `3000`)
+- `WORKER_PORT`: Worker health endpoint port (default: `3003`)
 - `NEXT_PUBLIC_API_URL`: Frontend API URL (default: `http://localhost:3001`)
 
 ### Optional Variables
 
 - `NODE_ENV`: Environment mode (default: `production`)
-- `DISABLE_MONITORING`: Set to `true` to disable monitoring (default: disabled)
+- `DISABLE_MONITORING`: Set to `true` to disable worker monitoring (default: `false`)
 
 ## Service Architecture
 
@@ -102,7 +104,13 @@ Edit the `.env` file with your settings:
        │
        ▼
 ┌─────────────┐
-│ PostgreSQL  │  :5432
+│   DB (pg)   │  :5432
+└─────────────┘
+       ▲
+       │
+┌─────────────┐
+│   Worker    │  :3003
+│ monitoring  │
 └─────────────┘
 ```
 
@@ -126,7 +134,8 @@ docker compose logs -f
 # Specific service
 docker compose logs -f api
 docker compose logs -f web
-docker compose logs -f postgres
+docker compose logs -f worker
+docker compose logs -f db
 ```
 
 ### Restart a Service
@@ -141,30 +150,24 @@ docker compose ps
 
 ### Access Database
 ```bash
-docker compose exec postgres psql -U unifiedcron -d unifiedcron
+docker compose exec db psql -U unifiedcron -d unifiedcron
 ```
 
 ### Run Database Migrations Manually
 ```bash
-docker compose exec api node packages/database/dist/migrate.js
+pnpm db:migrate
 ```
 
 ## Data Persistence
 
-Database data is stored in a Docker volume named `postgres_data`. To persist data:
+Database data is persisted via the `./db-data` bind mount used by compose.
 
 ```bash
-# List volumes
-docker volume ls
-
-# Inspect volume
-docker volume inspect unifiedcron_postgres_data
-
 # Backup database
-docker compose exec postgres pg_dump -U unifiedcron unifiedcron > backup.sql
+docker compose exec db pg_dump -U unifiedcron unifiedcron > backup.sql
 
 # Restore database
-docker compose exec -T postgres psql -U unifiedcron unifiedcron < backup.sql
+docker compose exec -T db psql -U unifiedcron unifiedcron < backup.sql
 ```
 
 ## Troubleshooting
@@ -192,13 +195,13 @@ docker compose exec -T postgres psql -U unifiedcron unifiedcron < backup.sql
 
 1. **Wait for database to be ready**:
    ```bash
-   docker compose logs postgres
+   docker compose logs db
    ```
    Look for: `database system is ready to accept connections`
 
 2. **Test database connection**:
    ```bash
-   docker compose exec postgres pg_isready -U unifiedcron
+   docker compose exec db pg_isready -U unifiedcron
    ```
 
 3. **Check environment variables**:
@@ -320,6 +323,20 @@ docker compose ps
 ```
 
 Healthy services show `healthy` status.
+
+### Runtime Smoke Test
+
+Run a full migration + API/web/worker smoke flow:
+
+```bash
+POSTGRES_PORT=5434 pnpm smoke:compose
+```
+
+Expected success marker:
+
+```text
+COMPOSE_SMOKE_OK
+```
 
 ## Support
 

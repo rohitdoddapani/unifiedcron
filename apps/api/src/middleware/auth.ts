@@ -1,7 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.ENCRYPTION_KEY || 'change-me-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required');
+}
+
+const REQUIRED_JWT_SECRET: string = JWT_SECRET as string;
 
 export interface AuthRequest extends Request {
   userId?: string;
@@ -21,11 +27,19 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7);
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string };
-      req.userId = decoded.userId;
+      const decoded = jwt.verify(token, REQUIRED_JWT_SECRET) as { userId?: string; id?: string; sub?: string; email?: string };
+      const resolvedUserId = decoded.userId || decoded.id || decoded.sub;
+      if (!resolvedUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid authentication token',
+        });
+      }
+
+      req.userId = resolvedUserId;
       req.user = {
-        id: decoded.userId,
-        email: decoded.email,
+        id: resolvedUserId,
+        email: decoded.email || '',
       };
       return next();
     } catch (error) {
@@ -53,11 +67,16 @@ export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7);
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string };
-      req.userId = decoded.userId;
+      const decoded = jwt.verify(token, REQUIRED_JWT_SECRET) as { userId?: string; id?: string; sub?: string; email?: string };
+      const resolvedUserId = decoded.userId || decoded.id || decoded.sub;
+      if (!resolvedUserId) {
+        return next();
+      }
+
+      req.userId = resolvedUserId;
       req.user = {
-        id: decoded.userId,
-        email: decoded.email,
+        id: resolvedUserId,
+        email: decoded.email || '',
       };
     } catch (error) {
       // Token invalid, continue without auth
@@ -65,4 +84,3 @@ export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction
   }
   next();
 }
-

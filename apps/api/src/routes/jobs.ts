@@ -1,5 +1,6 @@
 import { Router, IRouter } from 'express';
 import { JobService } from '../services/JobService';
+import { AuthRequest } from '../middleware/auth';
 
 const router: IRouter = Router();
 const jobService = new JobService();
@@ -7,17 +8,10 @@ const jobService = new JobService();
 // Get all jobs for a user
 router.get('/', async (req, res, next) => {
   try {
-    const userId = req.query.userId as string;
+    const userId = (req as AuthRequest).userId!;
     const platform = req.query.platform as string;
     const limit = parseInt(req.query.limit as string) || 100;
     const offset = parseInt(req.query.offset as string) || 0;
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'userId is required'
-      });
-    }
 
     const jobs = await jobService.getJobs(userId, { platform, limit, offset });
     
@@ -34,14 +28,7 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const userId = req.query.userId as string;
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'userId is required'
-      });
-    }
+    const userId = (req as AuthRequest).userId!;
 
     const job = await jobService.getJob(id, userId);
     if (!job) {
@@ -64,14 +51,7 @@ router.get('/:id', async (req, res, next) => {
 router.post('/:connectionId/refresh', async (req, res, next) => {
   try {
     const { connectionId } = req.params;
-    const userId = req.query.userId as string;
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'userId is required'
-      });
-    }
+    const userId = (req as AuthRequest).userId!;
 
     const result = await jobService.refreshJobs(connectionId, userId);
     
@@ -88,16 +68,9 @@ router.post('/:connectionId/refresh', async (req, res, next) => {
 router.get('/:id/runs', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const userId = req.query.userId as string;
+    const userId = (req as AuthRequest).userId!;
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'userId is required'
-      });
-    }
 
     const runs = await jobService.getJobRuns(id, userId, { limit, offset });
     
@@ -114,14 +87,7 @@ router.get('/:id/runs', async (req, res, next) => {
 router.get('/:id/stats', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const userId = req.query.userId as string;
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'userId is required'
-      });
-    }
+    const userId = (req as AuthRequest).userId!;
 
     const stats = await jobService.getJobStats(id, userId);
     

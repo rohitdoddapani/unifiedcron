@@ -2,16 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Clock, 
   Plus,
   RefreshCw,
   Database,
-  Loader2
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -41,12 +38,8 @@ function DashboardContent() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      
-      // Get user ID first
-      const userId = await api.getDefaultUserId();
-      
-      // Fetch real connections
-      const connectionsResponse = await api.getConnections(userId);
+
+      const connectionsResponse = await api.getConnections();
       if (connectionsResponse.success && connectionsResponse.data && Array.isArray(connectionsResponse.data)) {
         const conns = connectionsResponse.data;
         setConnections(conns);

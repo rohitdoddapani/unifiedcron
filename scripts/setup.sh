@@ -58,6 +58,28 @@ if ! grep -q "ENCRYPTION_KEY=" .env.local || grep -q "ENCRYPTION_KEY=replace_me_
     echo "✅ Generated and set ENCRYPTION_KEY"
 fi
 
+if ! grep -q "JWT_SECRET=" .env.local || grep -q "JWT_SECRET=replace_me_with_32_bytes_key" .env.local; then
+    JWT_SECRET=$(openssl rand -base64 32)
+    if grep -q "JWT_SECRET=" .env.local; then
+        sed -i.bak "s/JWT_SECRET=.*/JWT_SECRET=$JWT_SECRET/" .env.local
+        rm .env.local.bak
+    else
+        echo "JWT_SECRET=$JWT_SECRET" >> .env.local
+    fi
+    echo "✅ Generated and set JWT_SECRET"
+fi
+
+if ! grep -q "NEXTAUTH_SECRET=" .env.local || grep -q "NEXTAUTH_SECRET=replace_me_with_32_bytes_secret" .env.local; then
+    NEXTAUTH_SECRET=$(openssl rand -base64 32)
+    if grep -q "NEXTAUTH_SECRET=" .env.local; then
+        sed -i.bak "s/NEXTAUTH_SECRET=.*/NEXTAUTH_SECRET=$NEXTAUTH_SECRET/" .env.local
+        rm .env.local.bak
+    else
+        echo "NEXTAUTH_SECRET=$NEXTAUTH_SECRET" >> .env.local
+    fi
+    echo "✅ Generated and set NEXTAUTH_SECRET"
+fi
+
 echo ""
 echo "🎉 Setup complete!"
 echo ""

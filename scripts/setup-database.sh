@@ -131,6 +131,8 @@ NODE_ENV=development
 
 # Frontend Configuration
 NEXT_PUBLIC_API_URL=http://localhost:3001
+JWT_SECRET=$(openssl rand -base64 32)
+NEXTAUTH_SECRET=$(openssl rand -base64 32)
 EOF
     echo "✅ Created .env.local"
 fi

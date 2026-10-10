@@ -1,19 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import { ApiResponse } from '@unifiedcron/shared';
+import { logEvent } from '@unifiedcron/shared';
+import { ZodError } from '@unifiedcron/shared';
 
 export function errorHandler(
   error: Error,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ) {
-  console.error('API Error:', {
-    message: error.message,
-    stack: error.stack,
-    url: req.url,
-    method: req.method,
-    body: req.body
-  });
+  logEvent('error', 'api.error', { name: error.name, path: req.path, method: req.method });
 
   // Don't leak error details in production
   const isDevelopment = process.env.NODE_ENV === 'development';
@@ -24,7 +20,11 @@ export function errorHandler(
   };
 
   // Handle specific error types
-  if (error.name === 'ValidationError') {
+  if (error instanceof ZodError) {
+    res.status(400).json({ success: false, error: error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; ') });
+  } else if (error.name === 'WebhookValidationError') {
+    res.status(400).json({ success: false, error: error.message });
+  } else if (error.name === 'ValidationError') {
     res.status(400).json(response);
   } else if (error.name === 'UnauthorizedError') {
     res.status(401).json(response);
