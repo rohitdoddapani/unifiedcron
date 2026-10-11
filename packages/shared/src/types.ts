@@ -6,7 +6,9 @@ export type Platform = z.infer<typeof PlatformSchema>;
 
 // Connection types
 export const ConnectionConfigSchema = z.object({
-  mode: z.enum(['postgres', 'legacy_anon']).optional(),
+  mode: z.enum(['postgres', 'push', 'legacy_anon']).optional(),
+  projectRef: z.string().optional(),
+  pushKey: z.string().optional(),
   connectionString: z.string().optional(),
   caCertificate: z.string().optional(),
   projectUrl: z.string().optional(),

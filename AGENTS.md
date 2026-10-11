@@ -60,6 +60,17 @@ No upstream jobs or run history were deleted. Review exposed commands for creden
 Reader setup is prepared but NOT executed: the owner must enter its new password and submit it.
 Existing production connection remains legacy; worker records an explicit migration-required error.
 Do not report live cloud ingestion restored until reader credentials/TLS are configured and validated.
+Subsequent owner browser setup succeeded, and the official Supabase CA was added to the connection form.
+Cloud validation remains blocked by PUBLIC writes to pg_net's queue/response tables.
+The owner approved a transactional net-schema isolation attempt; assertions failed and it rolled back.
+Verified SQL Editor role postgres lacks grant option and supabase_admin membership; net ACLs are unchanged.
+Hosted Supabase does not support per-project changes to these managed pg_net grants:
+https://supabase.com/docs/guides/troubleshooting/revoking-access-to-pg_net-objects-has-no-effect-0bbc16
+Do not retry ineffective REVOKEs, elevate to managed roles, disable the reader validator, or drop pg_net
+without separate informed approval. Signed push ingestion is being implemented for projects using pg_net:
+private source signing key, pg_cron/pg_net producer with signed receipts, bounded durable API inbox,
+worker-only processing and existing incident semantics. Migration 007 is additive. Verify test/deployment
+evidence before claiming it is live; cloud sender installation requires an owner handoff with its private key.
 
 See `docs/REVIEW_FIXES.md` and the rewritten `docs/SUPABASE_SETUP.md`.
 New connections require a dedicated PostgreSQL reader with verified TLS, private metadata views,

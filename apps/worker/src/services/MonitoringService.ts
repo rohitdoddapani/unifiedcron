@@ -39,6 +39,8 @@ export class MonitoringService {
   }
 
   async cleanupOldData() {
+    // Retain the digest for retry receipts, but discard processed telemetry bodies.
+    await query(`UPDATE supabase_push_batches SET payload='{}'::jsonb WHERE "processedAt" < NOW()-INTERVAL '7 days' AND payload<>'{}'::jsonb`);
     // Error text can contain sensitive provider data. Retain it for seven days only.
     await query(`UPDATE "jobRuns" SET message=NULL WHERE message IS NOT NULL AND "startedAt" < NOW()-INTERVAL '7 days'`);
     await query(`UPDATE alerts SET details=jsonb_set(details,'{jobRun,message}','null'::jsonb)

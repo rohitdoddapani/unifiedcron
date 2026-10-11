@@ -22,6 +22,7 @@ export function isAllowedSupabaseHost(hostname: string): boolean {
 
 export function supabaseProjectIdentity(config: ConnectionConfig): string | null {
   try {
+    if (config.mode === 'push' && config.projectRef) return `cloud:${config.projectRef}:postgres`;
     if (config.mode !== 'postgres' && config.projectUrl) {
       const match = /^([a-z0-9-]+)\.supabase\.co$/i.exec(new URL(config.projectUrl).hostname);
       return match ? `cloud:${match[1].toLowerCase()}:postgres` : null;

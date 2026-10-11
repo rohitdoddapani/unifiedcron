@@ -1,4 +1,48 @@
+---
+
+title: "Supabase Setup"
+
+---
+
 # Secure Supabase Connection Setup
+
+## Hosted Supabase: Signed Push (Recommended)
+
+Hosted Supabase's managed `pg_net` privileges cannot be removed from a database login role.
+Use **Hosted Supabase: signed push** in Connections instead of sharing a database login.
+Enter the 20-character project reference from your Supabase dashboard URL and a display label.
+For an existing connection, use **Switch to signed push** / **Switch to secure connection** to retain its history.
+Create the connection, copy **sender SQL**, and run it as `postgres` in that same project's SQL Editor.
+The source requires `pg_cron`, `pg_net`, and `pgcrypto` installed in the `extensions` schema.
+Configure `INGEST_PUBLIC_URL` to your UnifiedCron installation's public HTTPS API origin first.
+Local-only HTTP installations cannot receive cloud pushes; use an HTTPS-reachable test installation.
+
+The script creates a private `unifiedcron_push` schema, source checkpoint/outbox, a restricted
+SECURITY DEFINER sender and a one-minute cron job. It does not change managed `net` grants.
+Other non-privileged roles cannot read the key or execute the sender. Database administrators remain trusted.
+The signing key appears only in the authenticated setup script/private table and encrypted app config,
+not in a cron command, request header or queued payload. Keep saved setup SQL private.
+No database passwords, cron commands or free-form run messages are transmitted.
+
+Requests use HMAC-SHA256 over `timestamp + '.' + original JSON bytes`, with a five-minute replay window.
+Each connection has monotonically increasing batch sequences. The API durably queues authenticated batches;
+the dedicated worker commits jobs/runs/incidents with the processed checkpoint. Retries are idempotent.
+The API's acknowledgement is also signed: untrusted writes to `net._http_response` cannot forge acceptance.
+Source checkpoints advance only after this receipt verifies; failed delivery retries after two minutes.
+Metadata in the pg_net queue remains readable to database login roles, and those roles can disrupt its
+delivery. This design protects integrity and avoids sharing broad credentials; it does not promise availability
+against a database role that can modify managed queues. Never expose `unifiedcron_push` in the Data API.
+
+First sync retains the seven-day / 10,000-run backfill bound. New runs page 500 per batch; up to 500
+unfinished runs refresh per batch with rotation. Discovery is a full snapshot, capped at 1,000 jobs;
+oversized snapshots fail explicitly rather than archiving truncated jobs. Initial historical failures
+do not generate a notification storm. Freshness failures become visible after three minutes.
+Use **Test** after installation, then wait for a worker cycle and check Jobs.
+If installation fails, inspect the named `unifiedcron-push-<connection UUID>` cron job and its run history.
+After deleting an app connection, unschedule its source cron job as well; otherwise it will keep retrying.
+Do not drop pg_net or change its managed grants as a workaround.
+
+## Direct PostgreSQL Reader (Restricted Installations Only)
 
 UnifiedCron supports Supabase pg_cron today. Connect each project using a dedicated PostgreSQL reader,
 not an anon or service-role API key. Supabase SQL Editor is part of the cloud dashboard; no local editor is required.
@@ -64,6 +108,18 @@ forward by runid and refreshes unfinished runs. Purge gaps are visible rather th
 Busy connections can remain in catch-up mode across cycles. A reset in upstream run IDs requires operator review.
 
 ## Troubleshooting
+
+### Hosted projects with pg_net
+
+The direct reader integration is currently incompatible with hosted projects whose managed `pg_net`
+grants give every login role write access to `net.http_request_queue` and `net._http_response`.
+The strict permission validator rejects this access deliberately. Hosted SQL Editor's `postgres` role
+cannot revoke grants owned by `supabase_admin`; statements may appear successful while doing nothing.
+Do not disable validation or repeatedly revoke the reader's direct grants: PUBLIC privileges still apply.
+Use the signed-push method above instead. The reader permission check remains strict.
+Do not drop `pg_net` as a quick fix: that removes queued requests/responses and stops Database Webhooks
+and cron jobs depending on its HTTP functions. That requires a separate dependency review and approval.
+See [Supabase's managed pg_net permission limitation](https://supabase.com/docs/guides/troubleshooting/revoking-access-to-pg_net-objects-has-no-effect-0bbc16).
 
 - Permission denied on `unifiedcron`: run the private reader setup in the correct project.
 - Reader can access commands / broad privileges: check cron schema usage, role memberships and existing PUBLIC grants.

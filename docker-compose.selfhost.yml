@@ -36,6 +36,7 @@ services:
       - SUPABASE_ALLOW_PRIVATE_NETWORK=${SUPABASE_ALLOW_PRIVATE_NETWORK:-false}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3002,http://127.0.0.1:3000,http://127.0.0.1:3002}
       - API_PORT=3001
+      - INGEST_PUBLIC_URL=${INGEST_PUBLIC_URL:-${NEXT_PUBLIC_API_URL:-http://localhost:3001}}
     ports:
       - "${API_PORT:-3001}:3001"
     depends_on:

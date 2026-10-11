@@ -23,20 +23,18 @@ const SUPABASE_PLATFORM = {
   icon: Database,
   color: 'bg-green-100 text-green-800',
   description: 'Discover and monitor pg_cron jobs in your Supabase database',
-  fields: [
-    { name: 'connectionString', label: 'Project URL', type: 'url', placeholder: 'https://your-project.supabase.co' },
-    { name: 'caCertificate', label: 'Anonymous Key', type: 'password', placeholder: 'eyJ...' }
-  ]
 };
 
 function ConnectionsPageContent() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [setupSql, setSetupSql] = useState('');
+  const [connectionMode, setConnectionMode] = useState<'push'|'postgres'>('push');
+  const [projectRef, setProjectRef] = useState('');
+  const [pushInstallSql, setPushInstallSql] = useState('');
   async function openSetup(id: string | null = null) {
+    setConnectionMode('push'); setSetupSql(''); setPushInstallSql(''); setProjectRef(''); setError(null);
     setEditingId(id); setShowAddForm(true);
-    const response = await api.getSupabaseSetup();
-    if (response.success && response.data) setSetupSql(response.data.sql);
   }
   const [connections, setConnections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,6 +166,13 @@ function ConnectionsPageContent() {
     setSubmitting(true);
 
     try {
+      if (connectionMode === 'push') {
+        const response = await api.createSupabasePush({label:formData.label,projectRef,...(editingId ? {connectionId:editingId} : {})});
+        if (!response.success || !response.data) throw new Error(response.error || 'Unable to create push connection');
+        setPushInstallSql(response.data.sql);
+        await fetchConnections();
+        return;
+      }
       // Create the connection
       const config = { mode: 'postgres', connectionString: formData.connectionString, ...(formData.caCertificate ? { caCertificate: formData.caCertificate } : {}) };
       const response = editingId ? await api.updateConnection(editingId, { label: formData.label, config }) : await api.createConnection({ platform: 'supabase', label: formData.label, config });
@@ -267,10 +272,20 @@ function ConnectionsPageContent() {
                 </div>
               </div>
 
-              <p className="text-sm text-gray-600">Run the reader setup in your Supabase SQL editor, then use its session-pooler connection string with the generated password. This password is not saved until you submit the connection. If the reader role already exists, rotate it deliberately instead of rerunning CREATE ROLE.</p>
+              <label className="block text-sm font-medium">Connection method
+                <select className="input w-full mt-1" value={connectionMode} disabled={!!pushInstallSql} onChange={e => {
+                  const mode=e.target.value as 'push'|'postgres'; setConnectionMode(mode); setSetupSql('');
+                  if (mode==='postgres') void api.getSupabaseSetup().then(r=>{if(r.success && r.data) setSetupSql(r.data.sql);});
+                }}>
+                  <option value="push">Hosted Supabase: signed push (recommended)</option>
+                  <option value="postgres">Restricted PostgreSQL reader (not compatible with hosted pg_net)</option>
+                </select>
+              </label>
+              <p className="text-sm text-gray-600">{connectionMode==='push' ? 'Supabase sends signed job metadata every minute. No database login, commands or run messages are shared. Create the connection, then install its sender SQL as postgres in your project. pg_cron, pg_net and pgcrypto must be enabled.' : 'Use the restricted reader and verified TLS. Hosted pg_net inherits broad permissions and cannot use this mode. Do not disable security checks.'}</p>
+              {pushInstallSql && <div className="space-y-3 border rounded p-3 bg-green-50"><p className="font-medium">Connection saved. Install this SQL in your Supabase project.</p><p className="text-sm">This contains a private signing key. Keep it private and do not rerun the old reader setup. Monitoring begins after the first signed batch arrives.</p><details><summary className="cursor-pointer">Show sender SQL (contains signing key)</summary><pre className="whitespace-pre-wrap break-all text-xs max-h-64 overflow-auto">{pushInstallSql}</pre></details><Button type="button" onClick={() => void navigator.clipboard.writeText(pushInstallSql)}>Copy sender SQL</Button><Button variant="outline" onClick={() => {setShowAddForm(false);setPushInstallSql('');}}>Done</Button></div>}
               {setupSql && <details className="border rounded p-3"><summary className="cursor-pointer font-medium">Reader setup SQL (contains a generated password)</summary><pre className="whitespace-pre-wrap break-all text-xs max-h-48 overflow-auto mt-2">{setupSql}</pre><Button type="button" variant="outline" onClick={() => void navigator.clipboard.writeText(setupSql)}>Copy setup SQL</Button></details>}
               {editingId && <p className="text-sm text-amber-800">Also run the legacy cleanup SQL from the setup guide to revoke public cron access. Existing history will be retained.</p>}
-              <form onSubmit={handleSubmit} className="space-y-4">
+              {!pushInstallSql && <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Connection Label
@@ -286,7 +301,10 @@ function ConnectionsPageContent() {
                   />
                 </div>
 
-                <div>
+                {connectionMode==='push' && <label className="block text-sm font-medium">Supabase project reference
+                  <input className="input w-full mt-1" value={projectRef} onChange={e=>setProjectRef(e.target.value.trim())} placeholder="20-character reference from your Supabase dashboard URL" pattern="[a-z0-9]{20}" required />
+                </label>}
+                {connectionMode==='postgres' && <><div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     PostgreSQL connection string
                   </label>
@@ -305,7 +323,7 @@ function ConnectionsPageContent() {
                 <label className="block text-sm font-medium text-gray-700">CA certificate (when required by your database)
                   <textarea rows={3} className="input w-full font-mono text-xs" value={formData.caCertificate}
                     onChange={e => setFormData({ ...formData, caCertificate: e.target.value })} placeholder="-----BEGIN CERTIFICATE-----" />
-                </label>
+                </label></>}
 
                 {error && (
                   <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
@@ -325,7 +343,7 @@ function ConnectionsPageContent() {
                         Connecting...
                       </>
                     ) : (
-                      'Test & Connect'
+                      connectionMode==='push' ? 'Create signed push connection' : 'Test & Connect'
                     )}
                   </Button>
                   <Button 
@@ -341,7 +359,7 @@ function ConnectionsPageContent() {
                     Cancel
                   </Button>
                 </div>
-              </form>
+              </form>}
             </div>
 
             <button
@@ -395,7 +413,9 @@ function ConnectionsPageContent() {
                     {connection.ingestion?.cursor?.backlog && <p className="text-amber-700">Catching up: history is not fully current yet.</p>}
                     {Number(connection.historyGaps) > 0 && <p className="text-amber-700">Possible upstream history gaps: {connection.historyGaps}. This history may be incomplete.</p>}
                     {connection.ingestion?.lastError && <p className="text-red-700 break-words">{connection.ingestion.lastError}</p>}
-                    {connection.migrationRequired && <div className="rounded bg-amber-50 p-3 text-amber-900"><p>Anonymous-key access is unsafe and disabled. Revoke the legacy grants in Supabase and switch to the reader connection.</p><Button variant="outline" size="sm" onClick={() => { setFormData({ label: connection.label, connectionString: '', caCertificate: '' }); void openSetup(connection.id); }}>Switch to secure connection</Button></div>}
+                    {connection.migrationRequired && <div className="rounded bg-amber-50 p-3 text-amber-900"><p>Anonymous-key access is disabled. Use signed push for hosted Supabase; cached history is retained.</p><Button variant="outline" size="sm" onClick={() => { setFormData({ label: connection.label, connectionString: '', caCertificate: '' }); void openSetup(connection.id); }}>Switch to secure connection</Button></div>}
+                    {connection.config?.mode==='push' && <Button variant="outline" size="sm" onClick={async()=>{const r=await api.getSupabasePushSetup(connection.id);if(r.success && r.data){setConnectionMode('push');setSetupSql('');setPushInstallSql(r.data.sql);setShowAddForm(true);}else setError(r.error || 'Unable to load sender setup');}}>Sender setup SQL</Button>}
+                    {connection.config?.mode==='postgres' && <Button variant="outline" size="sm" onClick={()=>{setFormData({label:connection.label,connectionString:'',caCertificate:''});void openSetup(connection.id);}}>Switch to signed push</Button>}
                     {connection.lastChecked && (
                       <p>Last checked: {formatDate(connection.lastChecked)}</p>
                     )}

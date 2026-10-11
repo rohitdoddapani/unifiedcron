@@ -155,6 +155,11 @@ export class ConnectionService {
         };
       }
 
+      if (connection.config.mode === 'push') {
+        const state = (await query('SELECT "lastReceivedAt","receivedSequence","processedSequence" FROM supabase_push_state WHERE "connectionId"=$1',[id])).rows[0];
+        const fresh = state?.lastReceivedAt && Date.now()-new Date(state.lastReceivedAt).getTime()<180000;
+        return {success:!!fresh,message:fresh ? `Signed telemetry received; worker processed batch ${state.processedSequence} of ${state.receivedSequence}` : 'Awaiting signed telemetry. Install the sender SQL in Supabase, then check its cron job and pg_net responses.'};
+      }
       const supabaseResult = await integrations.validateSupabaseAccess(connection.config);
       return {
         success: supabaseResult,

@@ -55,6 +55,12 @@ export class JobService {
     const connection = await this.connectionService.getConnection(connectionId, userId);
     if (!connection) throw new Error('Connection not found or access denied');
     if (connection.platform !== 'supabase') throw new Error('Unsupported platform');
+    if (connection.config.mode === 'push') {
+      const state = (await query('SELECT "lastReceivedAt","receivedSequence","processedSequence" FROM supabase_push_state WHERE "connectionId"=$1',[connectionId])).rows[0];
+      if (!state?.lastReceivedAt || Date.now()-new Date(state.lastReceivedAt).getTime()>180000) throw new Error('Awaiting fresh signed telemetry; check the Supabase sender');
+      if (state.receivedSequence !== state.processedSequence) throw new Error('Signed telemetry is queued; the worker will discover jobs on its next cycle');
+      return {added:0,updated:0,removed:0,errors:[] as string[]};
+    }
     const jobs = await integrations.fetchSupabaseCronJobs(connection.config);
     return syncSupabaseJobs(connectionId, connection.label, jobs);
   }

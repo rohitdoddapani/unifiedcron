@@ -4,6 +4,11 @@ This technical follow-up is separate from the owner's private strategy notes.
 
 ## Implemented
 
+- Hosted Supabase can use signed push instead of a database login. A private source sender/outbox
+  sends only metadata, with HMAC-authenticated batches and acknowledgements; the dedicated worker
+  consumes a bounded durable inbox. The managed pg_net grants and strict reader validation stay unchanged.
+  Source SQL installation is an explicit owner action; code deployment alone does not activate this path.
+
 - New Supabase connections use a dedicated PostgreSQL reader. The anon/PostgREST cron path is disabled.
 - Administrator-owned private views handle pg_cron's row-level security without exposing command.
 - Column grants, verified TLS, checked/pinned DNS and default cloud-host restrictions limit access.
@@ -35,7 +40,9 @@ and once on production. Existing 4 users, 1 connection, 1 job and 89 runs were p
 All services passed health checks; public HTTPS, credentials sign-in, session token, ownership,
 CORS and encrypted-config compatibility checks passed.
 The owner's cloud legacy grants were revoked and verified in Supabase SQL Editor.
-The secure reader is not yet installed/configured; that connection's live ingestion remains paused.
+Reader setup subsequently succeeded, but direct validation was blocked by hosted pg_net PUBLIC grants.
+An owner-approved isolation attempt rolled back after verification failed; managed grants stayed unchanged.
+Use signed push instead; live ingestion remains paused until the owner installs that connection's sender.
 Other installations must still follow the owner-action instructions above.
 
 The regression suite uses a real isolated PostgreSQL server with TLS and pg_cron-style RLS fixtures.

@@ -19,6 +19,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { closePool } from '@unifiedcron/database';
 import { connectionsRouter } from './routes/connections';
+import { ingestRouter } from './routes/ingest';
 import { jobsRouter } from './routes/jobs';
 import { alertsRouter } from './routes/alerts';
 import { healthRouter } from './routes/health';
@@ -98,6 +99,8 @@ app.use(cors({
   },
   credentials: true
 }));
+// Signatures authenticate the original bytes, before the ordinary JSON parser.
+app.use('/api/ingest', express.raw({ type: 'application/json', limit: '2mb' }), ingestRouter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 

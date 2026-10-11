@@ -113,6 +113,14 @@ export const api = {
     return apiRequest<{ sql: string; username: string }>('/api/connections/supabase/setup');
   },
 
+  async createSupabasePush(input: {label: string; projectRef: string; connectionId?: string}) {
+    return apiRequest<{connection: {id: string}; sql: string}>('/api/connections/supabase/push', {method:'POST',body:JSON.stringify(input)});
+  },
+
+  async getSupabasePushSetup(id: string) {
+    return apiRequest<{sql: string}>(`/api/connections/${id}/push-setup`);
+  },
+
   async getJobs(options?: { platform?: string; limit?: number; offset?: number }) {
     const params = new URLSearchParams({
       ...(options?.platform && { platform: options.platform }),
