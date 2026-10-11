@@ -67,6 +67,15 @@ COMPOSE_SMOKE_OK
 
 ## Production (Hetzner)
 
+Latest application release: `72942f081ab586c9b5224840027b58ee372855da`, deployed 2026-10-10
+(America/Chicago). Backup and verification logs: `/srv/unifiedcron-backups/20261010-review`.
+Migration 006 passed twice on a production copy and on live data; counts remained 4 users,
+1 connection, 1 job and 89 runs. All five services and public HTTPS/auth/CORS/ownership checks passed.
+API/web/worker **and landing** were rebuilt for this release.
+Rollback image tags are `unifiedcron-{api,web,worker,landing}:pre-review-20261010`.
+Do not restore an older anonymous monitoring path: upstream legacy access has been revoked.
+The existing connection still needs its dedicated reader credentials before monitoring can resume.
+
 Verified host (2026-10-10): SSH alias `my-server`, hostname `tropis-ubuntu`,
 checkout `/srv/unifiedcron`. Access uses the owner's local SSH configuration.
 The shared reverse proxy is Nginx Proxy Manager; other applications also run on this host.

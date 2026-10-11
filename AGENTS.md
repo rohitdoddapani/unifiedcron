@@ -46,6 +46,21 @@ Public technical follow-up and owner actions are in `docs/REVIEW_FIXES.md`.
 
 ### Security/Ingestion Review Follow-up
 
+Release `72942f081ab586c9b5224840027b58ee372855da` deployed to Hetzner on 2026-10-10
+(America/Chicago). GitHub run 38087627163 passed quality and compose-smoke.
+Migration 006 passed twice on a restored production copy, preserving 4 users, 1 connection,
+1 job and 89 runs; credential decryption and stable identity checks passed.
+Live migration and API/web/worker/landing rebuilds completed; all five services are healthy.
+HTTPS, auth registration/sign-in/session, CORS and ownership verification passed; counts remain 4/1/1/89.
+Restricted backups and verification logs: `/srv/unifiedcron-backups/20261010-review`.
+Rollback images: `unifiedcron-{api,web,worker,landing}:pre-review-20261010`.
+The owner's cloud Supabase cleanup was executed in its SQL Editor and verified:
+PUBLIC/anon/authenticated cannot select the legacy views or execute the legacy function.
+No upstream jobs or run history were deleted. Review exposed commands for credentials that need rotation.
+Reader setup is prepared but NOT executed: the owner must enter its new password and submit it.
+Existing production connection remains legacy; worker records an explicit migration-required error.
+Do not report live cloud ingestion restored until reader credentials/TLS are configured and validated.
+
 See `docs/REVIEW_FIXES.md` and the rewritten `docs/SUPABASE_SETUP.md`.
 New connections require a dedicated PostgreSQL reader with verified TLS, private metadata views,
 checked/pinned DNS and cloud-host restrictions. API responses hide connection credentials.

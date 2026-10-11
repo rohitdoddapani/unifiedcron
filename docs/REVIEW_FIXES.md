@@ -29,6 +29,15 @@ The application verifies the actual permissions and TLS when that connection is 
 
 ## Validation Scope
 
+The 2026-10-10 release `72942f0` passed GitHub quality and compose-smoke checks, then deployed
+to the owner's Hetzner installation. Migration 006 passed twice on a restored production copy
+and once on production. Existing 4 users, 1 connection, 1 job and 89 runs were preserved.
+All services passed health checks; public HTTPS, credentials sign-in, session token, ownership,
+CORS and encrypted-config compatibility checks passed.
+The owner's cloud legacy grants were revoked and verified in Supabase SQL Editor.
+The secure reader is not yet installed/configured; that connection's live ingestion remains paused.
+Other installations must still follow the owner-action instructions above.
+
 The regression suite uses a real isolated PostgreSQL server with TLS and pg_cron-style RLS fixtures.
 It checks permission denial, certificate verification, paging beyond 1,000 runs, unfinished updates, purge gaps,
 rollback/replay, one incident during a failure storm, ordered recovery, identity preservation and public grant cleanup.
