@@ -67,14 +67,25 @@ COMPOSE_SMOKE_OK
 
 ## Production (Hetzner)
 
-Latest application release: `72942f081ab586c9b5224840027b58ee372855da`, deployed 2026-10-10
+Signed-push application release: `dd19b4ad9bdb972d2e8a2ff057eb49fc0ebe66c0`, deployed 2026-10-10
+(America/Chicago). CI run 38103104748 passed both gates; 11 unit and 14 integration tests passed.
+Migration 007 passed twice on a production copy and once live, preserving counts 4/1/1/89.
+All services, HTTPS, auth/session, CORS and ownership checks passed. Simulated signed telemetry
+crossed public HTTPS and natural worker cycles, verifying idempotent failure and automatic recovery.
+Temporary smoke data and test databases were removed; this does not claim the cloud sender is installed.
+Backups/logs: `/srv/unifiedcron-backups/20261010-push`; API/web/worker rollback tags `pre-push-20261010`.
+Set `INGEST_PUBLIC_URL` to the public HTTPS API origin (compose defaults to `NEXT_PUBLIC_API_URL`).
+The owner must create/migrate a signed-push connection and run its private sender SQL in Supabase.
+Do not publish that SQL: it contains a signing key. Managed pg_net grants remain unchanged.
+
+Previous reader/ingestion release: `72942f081ab586c9b5224840027b58ee372855da`, deployed 2026-10-10
 (America/Chicago). Backup and verification logs: `/srv/unifiedcron-backups/20261010-review`.
 Migration 006 passed twice on a production copy and on live data; counts remained 4 users,
 1 connection, 1 job and 89 runs. All five services and public HTTPS/auth/CORS/ownership checks passed.
 API/web/worker **and landing** were rebuilt for this release.
 Rollback image tags are `unifiedcron-{api,web,worker,landing}:pre-review-20261010`.
 Do not restore an older anonymous monitoring path: upstream legacy access has been revoked.
-The existing connection still needs its dedicated reader credentials before monitoring can resume.
+The hosted connection needs its signed-push sender installed before monitoring can resume.
 
 Verified host (2026-10-10): SSH alias `my-server`, hostname `tropis-ubuntu`,
 checkout `/srv/unifiedcron`. Access uses the owner's local SSH configuration.

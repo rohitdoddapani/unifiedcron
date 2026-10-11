@@ -69,8 +69,20 @@ https://supabase.com/docs/guides/troubleshooting/revoking-access-to-pg_net-objec
 Do not retry ineffective REVOKEs, elevate to managed roles, disable the reader validator, or drop pg_net
 without separate informed approval. Signed push ingestion is being implemented for projects using pg_net:
 private source signing key, pg_cron/pg_net producer with signed receipts, bounded durable API inbox,
-worker-only processing and existing incident semantics. Migration 007 is additive. Verify test/deployment
-evidence before claiming it is live; cloud sender installation requires an owner handoff with its private key.
+worker-only processing and existing incident semantics. Migration 007 is additive.
+Release `dd19b4ad9bdb972d2e8a2ff057eb49fc0ebe66c0` deployed on 2026-10-10 (America/Chicago).
+CI run 38103104748 passed quality and compose-smoke. All 11 unit and 14 integration tests passed,
+including generated producer SQL, 1,105-run paging, forged receipts, replay/expiry, denied key access,
+unfinished refreshes, worker rollback/replay, ownership/redaction and failure/recovery incidents.
+Migration 007 passed twice on a restored production copy and once live; counts stayed 4/1/1/89.
+All five services are healthy; public HTTPS, sign-in/session, CORS and ownership checks passed.
+Temporary signed telemetry sent over public HTTPS was ingested by natural worker cycles:
+`LIVE_PUSH_FAILURE_AND_DEDUPE_OK` and `LIVE_PUSH_RECOVERY_OK`. Its temporary account/data were removed.
+This is a simulated end-to-end pipeline check, NOT proof of the owner's live cloud sender.
+Backups/logs: `/srv/unifiedcron-backups/20261010-push`; rollback API/web/worker tags `pre-push-20261010`.
+Cloud sender installation still requires an owner handoff with its private key. The active account's
+Connections form is prefilled for its cloud project and waits for the owner to create/install signed push.
+Never paste the signing key/SQL into chat or expose unifiedcron_push via the Data API.
 
 See `docs/REVIEW_FIXES.md` and the rewritten `docs/SUPABASE_SETUP.md`.
 New connections require a dedicated PostgreSQL reader with verified TLS, private metadata views,

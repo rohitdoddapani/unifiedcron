@@ -94,8 +94,12 @@ Quick setup:
 
 ## Step 4: Set Up a Secure Supabase Connection
 
-Follow the secure Supabase setup guide. Run the reader SQL in your project's SQL Editor and connect with
-its PostgreSQL session-pooler credentials and verified TLS. Anonymous/service-role API keys are not supported.
+For hosted Supabase, follow the signed-push section of the secure Supabase setup guide. Configure a public
+HTTPS API origin with `INGEST_PUBLIC_URL`, create the connection using its project reference, and install
+the generated sender SQL in that project's SQL Editor. No database password or API key is needed.
+A local-only HTTP dashboard cannot receive cloud pushes; use an HTTPS-reachable test deployment.
+Restricted databases without managed pg_net grants may use the direct reader with verified TLS instead.
+Anonymous/service-role API keys are not supported.
 If you used the previous public cron views, run the legacy cleanup SQL before switching the connection.
 
 

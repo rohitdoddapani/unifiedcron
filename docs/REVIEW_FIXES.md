@@ -9,7 +9,7 @@ This technical follow-up is separate from the owner's private strategy notes.
   consumes a bounded durable inbox. The managed pg_net grants and strict reader validation stay unchanged.
   Source SQL installation is an explicit owner action; code deployment alone does not activate this path.
 
-- New Supabase connections use a dedicated PostgreSQL reader. The anon/PostgREST cron path is disabled.
+- Direct connections require a dedicated PostgreSQL reader; hosted connections can use signed push. The anon/PostgREST cron path is disabled.
 - Administrator-owned private views handle pg_cron's row-level security without exposing command.
 - Column grants, verified TLS, checked/pinned DNS and default cloud-host restrictions limit access.
 - Connection validation rejects privileged roles, memberships, command reads and accessible write/security-definer grants.
@@ -26,13 +26,19 @@ This technical follow-up is separate from the owner's private strategy notes.
 
 ## Required Owner Action
 
-The existing cloud project must run `docs/supabase-cleanup.sql` in Supabase SQL Editor.
+Any project that installed the former public interfaces must run `docs/supabase-cleanup.sql` in Supabase SQL Editor.
 An anon key cannot perform that administrative revocation. Deploying the application does not itself revoke
 previously installed grants in a separate cloud database. Review/rotate any credentials that appeared in exposed commands.
-Then install the reader role and update the existing connection using its pooler credentials and CA certificate.
-The application verifies the actual permissions and TLS when that connection is submitted.
+For hosted Supabase, update the connection to signed push and install its generated sender SQL.
+Use a direct reader only on installations where its strict permission checks can pass.
 
 ## Validation Scope
+
+Signed-push release `dd19b4a` passed 11 unit and 14 PostgreSQL integration tests plus both CI gates,
+then deployed to Hetzner. Migration 007 was rehearsed twice and applied live with existing data intact.
+Public HTTPS signed telemetry was processed by natural worker cycles, verifying retry dedupe and
+failure-to-success incident recovery. Temporary smoke data was removed. Actual cloud sender installation
+remains an owner action; these pipeline tests do not claim it is already running in Supabase.
 
 The 2026-10-10 release `72942f0` passed GitHub quality and compose-smoke checks, then deployed
 to the owner's Hetzner installation. Migration 006 passed twice on a restored production copy
@@ -48,7 +54,9 @@ Other installations must still follow the owner-action instructions above.
 The regression suite uses a real isolated PostgreSQL server with TLS and pg_cron-style RLS fixtures.
 It checks permission denial, certificate verification, paging beyond 1,000 runs, unfinished updates, purge gaps,
 rollback/replay, one incident during a failure storm, ordered recovery, identity preservation and public grant cleanup.
-Cloud pooler login with this owner's reader is not verified until the owner installs/provides its credentials.
+The owner's pooler authenticated with verified TLS, but failed the least-privilege check due to managed
+pg_net grants. The replacement push path passed PostgreSQL producer fixtures; installing the actual
+cloud sender remains an owner action. Do not equate simulated telemetry with live cloud monitoring.
 
 ## Still Planned
 
