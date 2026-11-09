@@ -8,8 +8,12 @@ dist/
 build/
 .next/
 
-# Environment variables
+# Private operational notes and strategy docs — must never reach this public repo
 docs/PRODUCT_DIRECTION.md
+RUNBOOK_PRIVATE.md
+*.private.md
+
+# Environment variables
 .env
 .env.local
 .env.development.local
