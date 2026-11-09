@@ -12,7 +12,7 @@ UnifiedCron is a self-hostable developer tool that centralizes cron jobs into on
 
 ## Current Status
 
-🚧 **Beta Release** - Currently supports **Supabase only**. Monitoring + in-app alerts are available for Supabase. Other platforms (GitHub Actions, Vercel, Netlify, n8n) will be added incrementally in future releases.
+🚧 **Beta Release** - Currently supports **Supabase only**. Monitoring + in-app alerts are available for Supabase. Other platforms are planned for future releases.
 
 ## Quick Start with Docker Compose (Recommended)
 
@@ -126,14 +126,11 @@ See the Development Guide at https://docs.unifiedcron.com/development for more d
 - Requires project URL and anonymous key
 - Discover all active cron jobs from your Supabase databases
 - Tracks run outcomes and raises failure alerts
-- Supports webhook notification endpoints for alert delivery
+- Supplies webhook notification endpoints for alert delivery
 - See the Supabase Setup Guide at https://docs.unifiedcron.com/supabase-setup for detailed instructions
 
-### 🚧 Coming Soon
-- **GitHub Actions**: Parse `.github/workflows/*.yml` files for cron schedules
-- **Vercel**: Read scheduled functions from `vercel.json`
-- **Netlify**: Read scheduled functions from `netlify.toml`
-- **n8n**: Connect via REST API to discover workflows with Cron nodes
+### 📅 Planned Platforms
+- GitHub Actions, Vercel, Netlify, and n8n are planned for future releases (not yet implemented)
 
 ## Getting Started with Supabase
 
@@ -186,7 +183,9 @@ unifiedcron/
 
 ## License
 
-MIT License - see LICENSE file for details
+Copyright (C) 2025-2026 Rohit Doddapaneni
+
+Licensed under the GNU Affero General Public License v3.0 — see [LICENSE](LICENSE) for the full text.
 
 ## Documentation
 
@@ -194,4 +193,4 @@ MIT License - see LICENSE file for details
 
 - Docs site: https://docs.unifiedcron.com
 - Source markdown: `docs/`
-- Nextra site: `docs-site/` (deploy this folder to Vercel)
+- Nextra site: `docs-site/`

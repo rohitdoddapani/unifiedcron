@@ -97,18 +97,6 @@ pnpm db:migrate
 2. Get your project URL and anonymous key from Supabase dashboard
 3. Add connection in UnifiedCron with these credentials
 
-### GitHub Actions
-1. Create a Personal Access Token with `repo` scope
-2. Add connection with repository name (owner/repo) and token
-
-### Vercel/Netlify
-1. These require GitHub integration for automatic discovery
-2. Add GitHub connection first, then Vercel/Netlify can parse config files
-
-### n8n
-1. Get your n8n instance URL and API key
-2. Add connection with base URL and API key
-
 ## API Endpoints
 
 ### Authentication
@@ -230,4 +218,4 @@ Optional:
 
 ## License
 
-MIT License - see LICENSE file for details
+AGPL-3.0 License
