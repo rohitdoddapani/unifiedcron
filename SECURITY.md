@@ -24,7 +24,7 @@ Signed-push code includes timestamp/signature verification, ordered sequences, d
 
 ## Implemented boundaries and limits
 
-User resource routes use verified JWT identity and ownership checks. Passwords are hashed with bcrypt. SQL queries use parameters. Push ingestion uses its signing protocol rather than a user session. Authentication and health routes have their own public entry points. The Supabase push ingest route has in-memory, per-process limits of 600 requests per minute per IP and 60 per minute per connection; these limits do not cover authentication routes.
+User resource routes use verified JWT identity and ownership checks. Passwords are hashed with bcrypt. SQL queries use parameters. Push ingestion uses its signing protocol rather than a user session. Authentication and health routes have their own public entry points. The Supabase push ingest route applies in-memory, per-process request limits of 600 per minute keyed on the connecting address and 60 per minute per connection. Express `trust proxy` is not configured, so behind a reverse proxy the connecting address is the proxy's and the first limit acts as a global cap on the route rather than a per-client control. These limits do not cover authentication routes.
 
 Webhook delivery and direct-reader networking validate destinations and pin resolved addresses; these controls reduce SSRF exposure but are not a general network firewall. A compromised runtime can reach whatever its network and credentials allow. Webhook receivers must verify signatures and deduplicate stable delivery IDs because delivery is at least once.
 
