@@ -27,6 +27,7 @@ import { usersRouter } from './routes/users';
 import { authRouter } from './routes/auth';
 import { notificationsRouter } from './routes/notifications';
 import { errorHandler } from './middleware/errorHandler';
+import { describeTrustProxy, parseTrustProxy, TrustProxySetting } from './lib/trustProxy';
 import { authenticate } from './middleware/auth';
 import { NotificationService } from './services/NotificationService';
 import { randomUUID } from 'crypto';
@@ -54,6 +55,26 @@ if (!process.env.JWT_SECRET) {
 
 const app: Application = express();
 const PORT = process.env.API_PORT || 3001;
+
+// `req.ip` drives the ingest rate-limit key, so forwarded addresses are honoured only as far
+// as the deployment's real topology justifies. Misconfiguration fails startup rather than
+// silently producing a limiter that either cannot tell clients apart or trusts spoofed headers.
+let trustProxy: TrustProxySetting;
+try {
+  trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
+} catch (error) {
+  console.error(`❌ ERROR: ${error instanceof Error ? error.message : 'Invalid TRUST_PROXY value'}`);
+  process.exit(1);
+}
+app.set('trust proxy', trustProxy);
+console.log('🔁 Trust proxy:', describeTrustProxy(trustProxy));
+if (trustProxy === false && process.env.NODE_ENV === 'production') {
+  console.warn(
+    '⚠️  TRUST_PROXY is not set. Behind a reverse proxy every request appears to come from the proxy, ' +
+      'so the per-address push ingest limit acts as one shared cap for the route. Set TRUST_PROXY to the ' +
+      'number of proxy hops in front of the API (for example TRUST_PROXY=1).'
+  );
+}
 const configuredOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean)
   : process.env.NODE_ENV === 'production'

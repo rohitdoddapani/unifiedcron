@@ -37,6 +37,11 @@ services:
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3002,http://127.0.0.1:3000,http://127.0.0.1:3002}
       - API_PORT=3001
       - INGEST_PUBLIC_URL=${INGEST_PUBLIC_URL:-${NEXT_PUBLIC_API_URL:-http://localhost:3001}}
+      # Empty means no proxy trusted; see docs/DEPLOYMENT.md#reverse-proxy-and-client-addresses
+      - TRUST_PROXY=${TRUST_PROXY:-}
+      - PUSH_RATE_LIMIT_PER_CONNECTION=${PUSH_RATE_LIMIT_PER_CONNECTION:-}
+      - PUSH_RATE_LIMIT_PER_IP=${PUSH_RATE_LIMIT_PER_IP:-}
+      - PUSH_RATE_LIMIT_MAX_KEYS=${PUSH_RATE_LIMIT_MAX_KEYS:-}
     ports:
       - "${API_PORT:-3001}:3001"
     depends_on:

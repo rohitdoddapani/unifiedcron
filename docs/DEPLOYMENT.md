@@ -130,6 +130,39 @@ Notes:
   - `dashboard.unifiedcron.com` → web (port 3000)
   - `api.unifiedcron.com` → api (port 3001)
 
+## Reverse Proxy and Client Addresses
+
+The signed-push ingest route rate limits per client address. The API only believes
+`X-Forwarded-For` as far as `TRUST_PROXY` allows, so this setting has to describe the
+topology you actually run.
+
+| Topology | Setting |
+| --- | --- |
+| API reached directly, no proxy | leave `TRUST_PROXY` unset |
+| One reverse proxy you operate (the layout above) | `TRUST_PROXY=1` |
+| Proxy plus a CDN that also appends a hop | `TRUST_PROXY=2` |
+| Proxy address known and stable | `TRUST_PROXY=172.18.0.0/16` (its address or subnet) |
+
+Count only hops you operate. Each trusted hop is one `X-Forwarded-For` entry a client
+could otherwise forge, so a count higher than the real chain lets callers pick the address
+they are limited on. A hop count is only sound while the proxy is the sole route to the
+API: a client that can open a connection to the API port directly supplies the first
+forwarded entry itself. The compose files publish `API_PORT` on the host, so restrict that
+port to the proxy at the firewall, or bind it to the proxy network only, if you rely on
+forwarded addresses. Trusting proxy addresses or subnets instead of a hop count avoids
+this, because a direct caller's socket address is not in the trusted set.
+
+`TRUST_PROXY=true` is rejected and the API exits at startup, as is an unparseable value.
+The startup log line `🔁 Trust proxy:` reports what was applied, and a production process
+with the setting unset logs a warning that the per-address ingest limit is acting as a
+single shared cap for the route.
+
+Your proxy must append the observed client address to `X-Forwarded-For` rather than
+replacing or dropping it. Verify after deploying: the ingest route is signature-protected,
+so check an address-bearing route reaches the API with the real client address rather than
+trusting the setting alone. Limit values are in `docker-compose.env.example`; what the
+limits do and do not guarantee is in [SECURITY.md](../SECURITY.md).
+
 ## Docs Site (Nextra + Vercel)
 
 Docs are hosted separately from the application containers.
