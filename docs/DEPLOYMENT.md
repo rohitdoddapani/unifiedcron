@@ -145,12 +145,38 @@ topology you actually run.
 
 Count only hops you operate. Each trusted hop is one `X-Forwarded-For` entry a client
 could otherwise forge, so a count higher than the real chain lets callers pick the address
-they are limited on. A hop count is only sound while the proxy is the sole route to the
-API: a client that can open a connection to the API port directly supplies the first
-forwarded entry itself. The compose files publish `API_PORT` on the host, so restrict that
-port to the proxy at the firewall, or bind it to the proxy network only, if you rely on
-forwarded addresses. Trusting proxy addresses or subnets instead of a hop count avoids
-this, because a direct caller's socket address is not in the trusted set.
+they are limited on.
+
+A hop count is only sound while every layer you trust is the sole route to the layer behind
+it. A caller that reaches a trusted layer directly supplies the forwarded entries the count
+would otherwise skip, so it chooses its own key. Two things to close:
+
+- **The API port.** `docker-compose.prod.yml` publishes the API on `127.0.0.1` only; the
+  reverse proxy reaches it over the `proxy` Docker network, so nothing off-host can connect
+  to it. `docker-compose.selfhost.yml` and `docker-compose.yml` publish it on all
+  interfaces, because the dashboard is normally reached directly in those layouts — if you
+  set `TRUST_PROXY` with one of those files, restrict the port at the firewall or add the
+  `127.0.0.1:` prefix yourself.
+- **The layer in front of your proxy.** With a CDN counted as a hop, the proxy must accept
+  traffic only from the CDN (origin firewall or allowlisted CDN ranges). A request that
+  reaches the proxy directly on port 443 still gets the CDN's hop subtracted from its own
+  forged header.
+
+Trusting proxy addresses or subnets instead of a hop count avoids both, because a direct
+caller's socket address is not in the trusted set.
+
+Check what is reachable from off-host before relying on a hop count — run this from another
+machine, not the server:
+
+```bash
+# Expect a timeout or refused connection for the API and database ports.
+nc -zv -w 5 your-server-address 3001
+nc -zv -w 5 your-server-address 5432
+```
+
+On the server, `docker compose -f docker-compose.prod.yml ps` shows the bind address of each
+published port (`127.0.0.1:3001->3001/tcp` is restricted; `0.0.0.0:3001->3001/tcp` is not),
+and a host firewall can still be blocking a port that compose publishes widely.
 
 `TRUST_PROXY=true` is rejected and the API exits at startup, as is an unparseable value.
 The startup log line `🔁 Trust proxy:` reports what was applied, and a production process

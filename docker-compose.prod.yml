@@ -43,7 +43,10 @@ services:
       - PUSH_RATE_LIMIT_PER_IP=${PUSH_RATE_LIMIT_PER_IP:-}
       - PUSH_RATE_LIMIT_MAX_KEYS=${PUSH_RATE_LIMIT_MAX_KEYS:-}
     ports:
-      - "${API_PORT:-3001}:3001"
+      # Loopback only: the reverse proxy reaches the API over the `proxy` network. A
+      # directly reachable API port would let callers forge the X-Forwarded-For entries
+      # TRUST_PROXY skips. See docs/DEPLOYMENT.md#reverse-proxy-and-client-addresses
+      - "127.0.0.1:${API_PORT:-3001}:3001"
     depends_on:
       db:
         condition: service_healthy
