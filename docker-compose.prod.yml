@@ -43,10 +43,12 @@ services:
       - PUSH_RATE_LIMIT_PER_IP=${PUSH_RATE_LIMIT_PER_IP:-}
       - PUSH_RATE_LIMIT_MAX_KEYS=${PUSH_RATE_LIMIT_MAX_KEYS:-}
     ports:
-      # Loopback only: the reverse proxy reaches the API over the `proxy` network. A
+      # Loopback by default: the reverse proxy reaches the API over the `proxy` network, and a
       # directly reachable API port would let callers forge the X-Forwarded-For entries
-      # TRUST_PROXY skips. See docs/DEPLOYMENT.md#reverse-proxy-and-client-addresses
-      - "127.0.0.1:${API_PORT:-3001}:3001"
+      # TRUST_PROXY skips. Set API_BIND_ADDRESS=0.0.0.0 only if your proxy runs on another
+      # host and must use this published port — then restrict the port at the firewall, or
+      # TRUST_PROXY cannot be trusted. See docs/DEPLOYMENT.md#reverse-proxy-and-client-addresses
+      - "${API_BIND_ADDRESS:-127.0.0.1}:${API_PORT:-3001}:3001"
     depends_on:
       db:
         condition: service_healthy

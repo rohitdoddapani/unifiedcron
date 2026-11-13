@@ -140,12 +140,22 @@ topology you actually run.
 | --- | --- |
 | API reached directly, no proxy | leave `TRUST_PROXY` unset |
 | One reverse proxy you operate (the layout above) | `TRUST_PROXY=1` |
-| Proxy plus a CDN that also appends a hop | `TRUST_PROXY=2` |
+| Proxy plus a CDN, and the proxy accepts traffic only from the CDN | `TRUST_PROXY=2` |
+| Proxy plus a CDN, origin also reachable directly, or you are unsure | `TRUST_PROXY=1` |
 | Proxy address known and stable | `TRUST_PROXY=172.18.0.0/16` (its address or subnet) |
 
-Count only hops you operate. Each trusted hop is one `X-Forwarded-For` entry a client
-could otherwise forge, so a count higher than the real chain lets callers pick the address
-they are limited on.
+Count only hops you operate, counting from the API outwards: the count is how many
+addresses closest to the API are trusted, and the first untrusted one becomes the key. Each
+trusted hop is one `X-Forwarded-For` entry a client could otherwise forge, so a count
+higher than the real chain lets callers pick the address they are limited on.
+
+**If you are not certain what sits in front of your proxy, use `TRUST_PROXY=1`.** One hop is
+sound whether or not the layer above it is restricted, because the only entry it trusts is
+the one your own proxy appends. With a CDN in front, the key is then the CDN edge address
+that contacted your proxy, so clients behind one edge share an address counter — acceptable,
+because the per-address cap is a coarse flood brake and the 60/min per-connection cap is the
+per-sender control. Raise it to `2` only once the origin is confirmed CDN-only; that buys
+finer keys, nothing more.
 
 A hop count is only sound while every layer you trust is the sole route to the layer behind
 it. A caller that reaches a trusted layer directly supplies the forwarded entries the count
@@ -162,11 +172,34 @@ would otherwise skip, so it chooses its own key. Two things to close:
   reaches the proxy directly on port 443 still gets the CDN's hop subtracted from its own
   forged header.
 
-Trusting proxy addresses or subnets instead of a hop count avoids both, because a direct
-caller's socket address is not in the trusted set.
+Trusting proxy addresses or subnets instead of a hop count removes the second concern,
+because a direct caller's socket address is not in the trusted set. It does not remove the
+first: when the API port is published, a connection arriving through Docker's userland proxy
+reaches the container from the bridge gateway address, which falls inside the very subnet you
+trusted. Restricting the port is the control that both forms depend on.
 
-Check what is reachable from off-host before relying on a hop count — run this from another
-machine, not the server:
+### Confirm the topology before you set it
+
+Run this on the server. It answers both questions the setting depends on — whether the proxy
+reaches the API over the Docker network, and which subnet that network uses:
+
+```bash
+# Containers attached to the `proxy` network. Your proxy container listed alongside
+# unifiedcron-api means it routes over the network, and the loopback bind is correct.
+docker network inspect proxy --format '{{range .Containers}}{{.Name}} {{end}}'
+
+# The subnet to use if you prefer trusting an address range over a hop count.
+docker network inspect proxy --format '{{range .IPAM.Config}}{{.Subnet}} {{end}}'
+```
+
+If your proxy is **not** on that network and reaches the API through the host's published
+port from another machine, the loopback bind blocks it. Set `API_BIND_ADDRESS=0.0.0.0` in
+`.env` to restore the old behaviour, and restrict port 3001 to the proxy at the firewall —
+otherwise no `TRUST_PROXY` value is trustworthy. Changing either takes effect when you
+recreate `api`; nothing else in the stack is affected.
+
+Then check what is actually reachable from off-host — run this from another machine, not the
+server:
 
 ```bash
 # Expect a timeout or refused connection for the API and database ports.

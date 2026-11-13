@@ -92,6 +92,43 @@ test('behind one trusted hop the client cannot select an earlier forwarded entry
   assert.equal(await keyFor(base, '8.8.8.8, 203.0.113.7'), 'ip:203.0.113.7');
 });
 
+test('a hop count above the restricted chain lets a direct caller choose its own key', async (t) => {
+  // Why docs/DEPLOYMENT.md recommends 1 unless the origin is confirmed CDN-only: the second
+  // hop is only real for traffic that came through the CDN. This client is the socket peer,
+  // standing in for a request that reached the proxy directly, and the entry its forged
+  // header supplies is the one a count of 2 lands on.
+  const lenient = await serve(t, (app) => {
+    app.set('trust proxy', parseTrustProxy('2'));
+    app.get('/key', (req, res) => res.json({ key: clientAddressKey(req) }));
+  });
+  assert.equal(await keyFor(lenient, '9.9.9.9, 203.0.113.7'), 'ip:9.9.9.9');
+
+  // One hop trusts only the entry the operator's own proxy appends, so the same request is
+  // keyed on the address that proxy observed no matter what precedes it.
+  const strict = await serve(t, (app) => {
+    app.set('trust proxy', parseTrustProxy('1'));
+    app.get('/key', (req, res) => res.json({ key: clientAddressKey(req) }));
+  });
+  assert.equal(await keyFor(strict, '9.9.9.9, 203.0.113.7'), 'ip:203.0.113.7');
+});
+
+test('trusting proxy addresses ignores forwarded entries from an untrusted socket', async (t) => {
+  // The address form does not depend on knowing how many layers are in front: a caller whose
+  // socket address is outside the trusted set is keyed on that address, headers and all.
+  const untrusted = await serve(t, (app) => {
+    app.set('trust proxy', parseTrustProxy('10.0.0.0/8'));
+    app.get('/key', (req, res) => res.json({ key: clientAddressKey(req) }));
+  });
+  assert.equal(await keyFor(untrusted, '9.9.9.9, 203.0.113.7'), 'ip:127.0.0.1');
+
+  // From a trusted proxy address the last entry is honoured, as with one trusted hop.
+  const trusted = await serve(t, (app) => {
+    app.set('trust proxy', parseTrustProxy('loopback'));
+    app.get('/key', (req, res) => res.json({ key: clientAddressKey(req) }));
+  });
+  assert.equal(await keyFor(trusted, '9.9.9.9, 203.0.113.7'), 'ip:203.0.113.7');
+});
+
 test('IPv6 clients are grouped by /64 so one host cannot mint unlimited keys', () => {
   assert.equal(normalizeClientAddress('2001:db8:1:2:3:4:5:6'), '2001:db8:1:2::/64');
   assert.equal(normalizeClientAddress('2001:db8:1:2::dead:beef'), '2001:db8:1:2::/64');
