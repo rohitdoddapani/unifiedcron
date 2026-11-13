@@ -130,6 +130,98 @@ Notes:
   - `dashboard.unifiedcron.com` → web (port 3000)
   - `api.unifiedcron.com` → api (port 3001)
 
+## Reverse Proxy and Client Addresses
+
+The signed-push ingest route rate limits per client address. The API only believes
+`X-Forwarded-For` as far as `TRUST_PROXY` allows, so this setting has to describe the
+topology you actually run.
+
+| Topology | Setting |
+| --- | --- |
+| API reached directly, no proxy | leave `TRUST_PROXY` unset |
+| One reverse proxy you operate (the layout above) | `TRUST_PROXY=1` |
+| Proxy plus a CDN, and the proxy accepts traffic only from the CDN | `TRUST_PROXY=2` |
+| Proxy plus a CDN, origin also reachable directly, or you are unsure | `TRUST_PROXY=1` |
+| Proxy address known and stable | `TRUST_PROXY=172.18.0.0/16` (its address or subnet) |
+
+Count only hops you operate, counting from the API outwards: the count is how many
+addresses closest to the API are trusted, and the first untrusted one becomes the key. Each
+trusted hop is one `X-Forwarded-For` entry a client could otherwise forge, so a count
+higher than the real chain lets callers pick the address they are limited on.
+
+**If you are not certain what sits in front of your proxy, use `TRUST_PROXY=1`.** One hop is
+sound whether or not the layer above it is restricted, because the only entry it trusts is
+the one your own proxy appends. With a CDN in front, the key is then the CDN edge address
+that contacted your proxy, so clients behind one edge share an address counter — acceptable,
+because the per-address cap is a coarse flood brake and the 60/min per-connection cap is the
+per-sender control. Raise it to `2` only once the origin is confirmed CDN-only; that buys
+finer keys, nothing more.
+
+A hop count is only sound while every layer you trust is the sole route to the layer behind
+it. A caller that reaches a trusted layer directly supplies the forwarded entries the count
+would otherwise skip, so it chooses its own key. Two things to close:
+
+- **The API port.** `docker-compose.prod.yml` publishes the API on `127.0.0.1` only; the
+  reverse proxy reaches it over the `proxy` Docker network, so nothing off-host can connect
+  to it. `docker-compose.selfhost.yml` and `docker-compose.yml` publish it on all
+  interfaces, because the dashboard is normally reached directly in those layouts — if you
+  set `TRUST_PROXY` with one of those files, restrict the port at the firewall or add the
+  `127.0.0.1:` prefix yourself.
+- **The layer in front of your proxy.** With a CDN counted as a hop, the proxy must accept
+  traffic only from the CDN (origin firewall or allowlisted CDN ranges). A request that
+  reaches the proxy directly on port 443 still gets the CDN's hop subtracted from its own
+  forged header.
+
+Trusting proxy addresses or subnets instead of a hop count removes the second concern,
+because a direct caller's socket address is not in the trusted set. It does not remove the
+first: when the API port is published, a connection arriving through Docker's userland proxy
+reaches the container from the bridge gateway address, which falls inside the very subnet you
+trusted. Restricting the port is the control that both forms depend on.
+
+### Confirm the topology before you set it
+
+Run this on the server. It answers both questions the setting depends on — whether the proxy
+reaches the API over the Docker network, and which subnet that network uses:
+
+```bash
+# Containers attached to the `proxy` network. Your proxy container listed alongside
+# unifiedcron-api means it routes over the network, and the loopback bind is correct.
+docker network inspect proxy --format '{{range .Containers}}{{.Name}} {{end}}'
+
+# The subnet to use if you prefer trusting an address range over a hop count.
+docker network inspect proxy --format '{{range .IPAM.Config}}{{.Subnet}} {{end}}'
+```
+
+If your proxy is **not** on that network and reaches the API through the host's published
+port from another machine, the loopback bind blocks it. Set `API_BIND_ADDRESS=0.0.0.0` in
+`.env` to restore the old behaviour, and restrict port 3001 to the proxy at the firewall —
+otherwise no `TRUST_PROXY` value is trustworthy. Changing either takes effect when you
+recreate `api`; nothing else in the stack is affected.
+
+Then check what is actually reachable from off-host — run this from another machine, not the
+server:
+
+```bash
+# Expect a timeout or refused connection for the API and database ports.
+nc -zv -w 5 your-server-address 3001
+nc -zv -w 5 your-server-address 5432
+```
+
+On the server, `docker compose -f docker-compose.prod.yml ps` shows the bind address of each
+published port (`127.0.0.1:3001->3001/tcp` is restricted; `0.0.0.0:3001->3001/tcp` is not),
+and a host firewall can still be blocking a port that compose publishes widely.
+
+`TRUST_PROXY=true` is rejected and the API exits at startup, as is an unparseable value.
+The startup log line `🔁 Trust proxy:` reports what was applied, and a production process
+with the setting unset logs a warning that the per-address ingest limit is acting as a
+single shared cap for the route.
+
+Your proxy must append the observed client address to `X-Forwarded-For` rather than
+replacing or dropping it. Verify after deploying: the ingest route is signature-protected,
+so check an address-bearing route reaches the API with the real client address rather than
+trusting the setting alone. Limit values are in `docker-compose.env.example`; what the
+limits do and do not guarantee is in [SECURITY.md](../SECURITY.md).
+
 ## Docs Site (Nextra + Vercel)
 
 Docs are hosted separately from the application containers.
