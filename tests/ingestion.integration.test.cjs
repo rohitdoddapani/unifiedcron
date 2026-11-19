@@ -64,6 +64,37 @@ test('verified TLS and private column grants expose metadata across cron RLS wit
  await query('DROP FUNCTION public.unsafe_reader_test()');
 });
 
+test('migration can be executed directly twice',async()=>{
+ const sql=fs.readFileSync(require('node:path').join(__dirname,'../packages/database/src/migrations/008_ingestion_error_codes.sql'),'utf8');
+ await query(sql);await query(sql);
+ const columns=(await query("SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='ingestion_state'")).rows.map(row=>row.column_name);
+ assert.ok(!columns.includes('lastError'));assert.ok(columns.includes('errorCode'));
+});
+
+test('driver failure does not expose connection details through the connection API',async()=>{
+ const express=require('../apps/api/node_modules/express');
+ const jwt=require('../apps/api/node_modules/jsonwebtoken');
+ const {authenticate}=require('../apps/api/dist/middleware/auth');
+ const {connectionsRouter}=require('../apps/api/dist/routes/connections');
+ const {errorHandler}=require('../apps/api/dist/middleware/errorHandler');
+ const host=randomUUID()+'.invalid', username=randomUUID();
+ const worker=new SupabaseIngestionService(async()=>{
+  const client=new Client({host,port:1,user:username,connectionTimeoutMillis:1000});
+  try {await client.connect();} finally {await client.end().catch(()=>{});}
+  throw new Error('unexpected connection');
+ });
+ await advance();await assert.rejects(worker.sync(connection));
+ const state=(await query('SELECT "errorCode" FROM ingestion_state WHERE "connectionId"=$1',[connection.id])).rows[0];
+ assert.equal(state.errorCode,'ingestion_failed');
+ const app=express();app.use('/api/connections',authenticate,connectionsRouter);app.use(errorHandler);
+ const server=app.listen(0,'127.0.0.1');await require('node:events').once(server,'listening');
+ try {
+  const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/connections/'+connection.id,{headers:{Authorization:'Bearer '+jwt.sign({userId:owner},process.env.JWT_SECRET)}});
+  assert.equal(response.status,200);const body=await response.text();
+  assert.ok(!body.includes(host));assert.ok(!body.includes(username));assert.ok(body.includes('ingestion_failed'));
+ } finally {server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
+});
+
 test('connection API verifies the reader, hides credentials and rejects legacy or cross-user changes',async()=>{
  const express=require('../apps/api/node_modules/express');
  const jwt=require('../apps/api/node_modules/jsonwebtoken');
