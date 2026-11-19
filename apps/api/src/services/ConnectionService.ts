@@ -1,3 +1,4 @@
+
 import { query } from '@unifiedcron/database';
 import { encrypt, decrypt } from '@unifiedcron/shared';
 import { Connection, ConnectionConfig, Platform } from '@unifiedcron/shared';
@@ -232,4 +233,3 @@ export class ConnectionService {
     return await this.decryptConfig(configData.encrypted || configData);
   }
 }
-Paperclip: GitHub capability_missing; continuing without managed credentials.
