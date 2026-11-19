@@ -80,9 +80,14 @@ test('running refreshes, worker rollback/replay, rename and removal preserve dur
  assert.equal((await query('SELECT name FROM jobs WHERE "connectionId"=$1',[connection.id])).rows[0].name,'renamed');
  await query("INSERT INTO cron.job_run_details VALUES(1168,7,'succeeded',now()+interval '2200 seconds',now(),NULL)");
  row=await send();receipt=await receive(row);await ack(row,receipt);
- await query(`CREATE FUNCTION push_fixture_fail() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."sourceRunId"='supabase:1168' THEN RAISE EXCEPTION 'fixture rollback'; END IF;RETURN NEW; END $$;
+ const canary=randomBytes(16).toString('hex');
+ await query(`CREATE FUNCTION push_fixture_fail() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."sourceRunId"='supabase:1168' THEN RAISE EXCEPTION '${canary}'; END IF;RETURN NEW; END $$;
  CREATE TRIGGER push_fixture_failure BEFORE INSERT ON "jobRuns" FOR EACH ROW EXECUTE FUNCTION push_fixture_fail()`);
- try{await assert.rejects(worker.sync(connection),/fixture rollback/);assert.equal((await query('SELECT 1 FROM "jobRuns" WHERE "sourceRunId"=\'supabase:1168\'')).rowCount,0);}
+ try{await assert.rejects(worker.sync(connection));assert.equal((await query('SELECT 1 FROM "jobRuns" WHERE "sourceRunId"=\'supabase:1168\'')).rowCount,0);
+  const state=(await query('SELECT * FROM ingestion_state WHERE "connectionId"=$1',[connection.id])).rows[0];
+  assert.equal(state.errorCode,'ingestion_failed');assert.ok(!JSON.stringify(state).includes(canary));
+  const projected=await new ConnectionService().getConnection(connection.id,owner);
+  assert.ok(!JSON.stringify(projected).includes(canary));assert.equal(projected.ingestion.errorCode,'ingestion_failed');}
  finally{await query('DROP TRIGGER push_fixture_failure ON "jobRuns";DROP FUNCTION push_fixture_fail()');}
  await worker.sync(connection);assert.equal((await query('SELECT 1 FROM "jobRuns" WHERE "sourceRunId"=\'supabase:1168\'')).rowCount,1);
  await query('DELETE FROM cron.job WHERE jobid=7');row=await send();receipt=await receive(row);await ack(row,receipt);await worker.sync(connection);

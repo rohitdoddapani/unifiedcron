@@ -11,6 +11,14 @@ export function normalizedStatus(status: string): 'running' | 'failed' | 'succee
   throw new Error('Unknown provider run status');
 }
 
+type IngestionErrorCode = 'upstream_run_ids_reset' | 'push_project_changed' | 'push_sequence_gap' | 'awaiting_push' | 'ingestion_failed';
+class IngestionError extends Error {
+  constructor(readonly code: IngestionErrorCode) { super(code); }
+}
+function errorCode(error: unknown): IngestionErrorCode {
+  return error instanceof IngestionError ? error.code : 'ingestion_failed';
+}
+
 export class SupabaseIngestionService {
   constructor(private openSource: (config: Connection['config']) => Promise<SupabaseSource> = openSupabaseSource) {}
 
@@ -30,7 +38,7 @@ export class SupabaseIngestionService {
       await syncSupabaseJobs(connection.id, connection.label, jobs, undefined);
       const bounds = await source.bounds();
       const cursor: Cursor = state.cursor;
-      if (cursor.lastRunId && bounds.max && BigInt(bounds.max) < BigInt(cursor.lastRunId)) throw new Error('Upstream run IDs reset; operator review is required before resetting the cursor');
+      if (cursor.lastRunId && bounds.max && BigInt(bounds.max) < BigInt(cursor.lastRunId)) throw new IngestionError('upstream_run_ids_reset');
       if (!cursor.lastRunId) {
         cursor.lastRunId = await source.backfillFloor(); cursor.backfill = true;
         await client.query('UPDATE ingestion_state SET cursor=$3::jsonb WHERE "connectionId"=$1 AND stream=$2', [connection.id,STREAM,JSON.stringify(cursor)]);
@@ -60,7 +68,7 @@ export class SupabaseIngestionService {
         try {
           await this.store(client, connection.id, rows, !!cursor.backfill);
           await client.query(`UPDATE ingestion_state SET cursor=$3::jsonb, "lastSyncedAt"=NOW(),
-            "lastError"=NULL,"consecutiveFailures"=0 WHERE "connectionId"=$1 AND stream=$2`,
+            "errorCode"=NULL,"consecutiveFailures"=0 WHERE "connectionId"=$1 AND stream=$2`,
           [connection.id,STREAM,JSON.stringify({ ...cursor, lastRunId: next })]);
           await client.query('COMMIT');
         } catch (error) { await client.query('ROLLBACK'); throw error; }
@@ -81,10 +89,10 @@ export class SupabaseIngestionService {
         cursor=cursor || jsonb_build_object('backlog',$3::boolean) WHERE "connectionId"=$1 AND stream=$2`, [connection.id,STREAM,!complete]);
       return { runs: total };
     } catch (error) {
-      if (locked) await client.query(`UPDATE ingestion_state SET "lastErrorAt"=NOW(),"lastError"=$3,
+      if (locked) await client.query(`UPDATE ingestion_state SET "lastErrorAt"=NOW(),"errorCode"=$3,
         "consecutiveFailures"="consecutiveFailures"+1,
         "nextPollAt"=NOW()+LEAST(900,60*power(2,LEAST("consecutiveFailures",4))) * INTERVAL '1 second'
-        WHERE "connectionId"=$1 AND stream=$2`, [connection.id,STREAM,error instanceof Error ? error.message.slice(0,512) : 'Ingestion failed']);
+        WHERE "connectionId"=$1 AND stream=$2`, [connection.id,STREAM,errorCode(error)]);
       throw error;
     } finally {
       if (source) await source.close().catch(() => undefined);
@@ -105,13 +113,13 @@ export class SupabaseIngestionService {
         const batch = (await client.query('SELECT * FROM supabase_push_batches WHERE "connectionId"=$1 AND "processedAt" IS NULL ORDER BY sequence LIMIT 1',[connection.id])).rows[0];
         if (!batch) break;
         const payload = SupabasePushSchema.parse(batch.payload);
-        if (payload.projectRef !== connection.config.projectRef) throw new Error('Push project identity changed');
+        if (payload.projectRef !== connection.config.projectRef) throw new IngestionError('push_project_changed');
         await client.query('BEGIN');
         try {
           const state = (await client.query('SELECT * FROM supabase_push_state WHERE "connectionId"=$1 FOR UPDATE',[connection.id])).rows[0];
-          if (BigInt(payload.sequence) !== BigInt(state.processedSequence)+1n) throw new Error('Push inbox sequence gap');
+          if (BigInt(payload.sequence) !== BigInt(state.processedSequence)+1n) throw new IngestionError('push_sequence_gap');
           const old = (await client.query('SELECT cursor FROM ingestion_state WHERE "connectionId"=$1 AND stream=$2 FOR UPDATE',[connection.id,STREAM])).rows[0].cursor;
-          if (old.lastRunId && BigInt(payload.lastRunId)<BigInt(old.lastRunId)) throw new Error('Upstream run IDs reset; operator review required');
+          if (old.lastRunId && BigInt(payload.lastRunId)<BigInt(old.lastRunId)) throw new IngestionError('upstream_run_ids_reset');
           if (!payload.backfill && old.lastRunId && payload.minimumRunId && BigInt(payload.minimumRunId)>BigInt(old.lastRunId)+1n) {
             await this.gap(client,connection.id,(BigInt(old.lastRunId)+1n).toString(),(BigInt(payload.minimumRunId)-1n).toString());
           }
@@ -121,17 +129,17 @@ export class SupabaseIngestionService {
             WHERE status='open' AND "jobId" IN (SELECT id FROM jobs WHERE "connectionId"=$1 AND "removedAt" IS NULL)`,[connection.id]);
           await client.query('UPDATE supabase_push_batches SET "processedAt"=NOW() WHERE "connectionId"=$1 AND sequence=$2',[connection.id,payload.sequence]);
           await client.query('UPDATE supabase_push_state SET "processedSequence"=$2 WHERE "connectionId"=$1',[connection.id,payload.sequence]);
-          await client.query(`UPDATE ingestion_state SET cursor=$3::jsonb,"lastSyncedAt"=NOW(),"lastError"=NULL,"consecutiveFailures"=0 WHERE "connectionId"=$1 AND stream=$2`,[connection.id,STREAM,JSON.stringify({lastRunId:payload.lastRunId,backfill:payload.backfill,sequence:payload.sequence})]);
+          await client.query(`UPDATE ingestion_state SET cursor=$3::jsonb,"lastSyncedAt"=NOW(),"errorCode"=NULL,"consecutiveFailures"=0 WHERE "connectionId"=$1 AND stream=$2`,[connection.id,STREAM,JSON.stringify({lastRunId:payload.lastRunId,backfill:payload.backfill,sequence:payload.sequence})]);
           await client.query('COMMIT');
           total += payload.runs.length;
         } catch (error) { await client.query('ROLLBACK'); throw error; }
       }
       const freshness = (await client.query('SELECT "lastReceivedAt" FROM supabase_push_state WHERE "connectionId"=$1',[connection.id])).rows[0];
-      if (!freshness?.lastReceivedAt || Date.now()-new Date(freshness.lastReceivedAt).getTime()>180000) throw new Error('Awaiting signed Supabase pushes; check the installed pg_cron sender and pg_net responses');
+      if (!freshness?.lastReceivedAt || Date.now()-new Date(freshness.lastReceivedAt).getTime()>180000) throw new IngestionError('awaiting_push');
       await client.query(`UPDATE ingestion_state SET "nextPollAt"=NOW()+INTERVAL '60 seconds',cursor=cursor || jsonb_build_object('backlog',EXISTS(SELECT 1 FROM supabase_push_batches WHERE "connectionId"=$1 AND "processedAt" IS NULL)) WHERE "connectionId"=$1 AND stream=$2`,[connection.id,STREAM]);
       return {runs:total};
     } catch (error) {
-      if (locked) await client.query(`UPDATE ingestion_state SET "lastErrorAt"=NOW(),"lastError"=$3,"consecutiveFailures"="consecutiveFailures"+1,"nextPollAt"=NOW()+INTERVAL '60 seconds' WHERE "connectionId"=$1 AND stream=$2`,[connection.id,STREAM,error instanceof Error ? error.message.slice(0,512) : 'Push ingestion failed']);
+      if (locked) await client.query(`UPDATE ingestion_state SET "lastErrorAt"=NOW(),"errorCode"=$3,"consecutiveFailures"="consecutiveFailures"+1,"nextPollAt"=NOW()+INTERVAL '60 seconds' WHERE "connectionId"=$1 AND stream=$2`,[connection.id,STREAM,errorCode(error)]);
       throw error;
     } finally {
       try { if (locked) await client.query('SELECT pg_advisory_unlock(hashtext($1),hashtext($2))',[STREAM,connection.id]); }

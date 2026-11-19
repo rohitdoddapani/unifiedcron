@@ -19,7 +19,7 @@ This technical follow-up is separate from the owner's private strategy notes.
 - First backfill is explicitly bounded to seven days / 10,000 rows. Backlog is visible; upstream ID resets require operator review.
 - Discovery uses jobid, preserves unnamed/renamed identities, archives missing jobs, and refreshes automatically with polling/backoff.
 - Failure storms update one open incident per job/type. Open and resolution notifications have separate idempotency keys. Old completions cannot resolve or reopen newer incidents.
-- Error text is capped and pruned after seven days by daily maintenance. Only resolved incidents are eligible for age-based cleanup.
+- Ingestion failures use closed error codes; historical raw ingestion errors are removed by migration 008. Run and incident message retention is separate. Only resolved incidents are eligible for age-based cleanup.
 - Cron parsing supports steps/ranges and pg_cron intervals, with real timezone-aware next times.
 - Vercel's internal parser now reads the documented crons array. Vercel remains unavailable as a live integration.
 - Landing copy marks non-Supabase integrations, native email/Slack and preview/SDK features as planned.

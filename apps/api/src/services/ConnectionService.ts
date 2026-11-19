@@ -1,3 +1,4 @@
+
 import { query } from '@unifiedcron/database';
 import { encrypt, decrypt } from '@unifiedcron/shared';
 import { Connection, ConnectionConfig, Platform } from '@unifiedcron/shared';
@@ -15,7 +16,10 @@ export class ConnectionService {
 
   async getConnections(userId: string): Promise<Connection[]> {
     const result = await query(
-      `SELECT c.*, row_to_json(s) AS ingestion,
+      `SELECT c.*, CASE WHEN s."connectionId" IS NULL THEN NULL ELSE json_build_object(
+        'cursor', s.cursor, 'lastSyncedAt', s."lastSyncedAt", 'lastErrorAt', s."lastErrorAt",
+        'errorCode', s."errorCode", 'consecutiveFailures', s."consecutiveFailures", 'nextPollAt', s."nextPollAt"
+      ) END AS ingestion,
         (SELECT count(*) FROM ingestion_gaps g WHERE g."connectionId"=c.id) AS "historyGaps"
        FROM connections c LEFT JOIN ingestion_state s ON s."connectionId"=c.id AND s.stream='supabase.runs'
        WHERE c."userId" = $1 ORDER BY c."createdAt" DESC`,
@@ -41,7 +45,10 @@ export class ConnectionService {
 
   async getConnection(id: string, userId: string): Promise<Connection | null> {
     const result = await query(
-      `SELECT c.*, row_to_json(s) AS ingestion,
+      `SELECT c.*, CASE WHEN s."connectionId" IS NULL THEN NULL ELSE json_build_object(
+        'cursor', s.cursor, 'lastSyncedAt', s."lastSyncedAt", 'lastErrorAt', s."lastErrorAt",
+        'errorCode', s."errorCode", 'consecutiveFailures', s."consecutiveFailures", 'nextPollAt', s."nextPollAt"
+      ) END AS ingestion,
         (SELECT count(*) FROM ingestion_gaps g WHERE g."connectionId"=c.id) AS "historyGaps"
        FROM connections c LEFT JOIN ingestion_state s ON s."connectionId"=c.id AND s.stream='supabase.runs'
        WHERE c.id=$1 AND c."userId"=$2`,

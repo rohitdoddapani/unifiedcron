@@ -402,7 +402,7 @@ function ConnectionsPageContent() {
                       </div>
                     </div>
                     <Badge variant={connection.status === 'connected' || !connection.status ? 'default' : 'destructive'}>
-                      {connection.migrationRequired ? 'Migration needed' : connection.ingestion?.lastError ? 'Sync failing' : connection.ingestion?.lastSyncedAt ? 'Synced' : 'Not synced'}
+                      {connection.migrationRequired ? 'Migration needed' : connection.ingestion?.errorCode ? 'Sync failing' : connection.ingestion?.lastSyncedAt ? 'Synced' : 'Not synced'}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -412,7 +412,7 @@ function ConnectionsPageContent() {
                     <p>Last synced: {connection.ingestion?.lastSyncedAt ? new Date(connection.ingestion.lastSyncedAt).toLocaleString() : 'Not yet'}</p>
                     {connection.ingestion?.cursor?.backlog && <p className="text-amber-700">Catching up: history is not fully current yet.</p>}
                     {Number(connection.historyGaps) > 0 && <p className="text-amber-700">Possible upstream history gaps: {connection.historyGaps}. This history may be incomplete.</p>}
-                    {connection.ingestion?.lastError && <p className="text-red-700 break-words">{connection.ingestion.lastError}</p>}
+                    {connection.ingestion?.errorCode && <p className="text-red-700 break-words">{connection.ingestion.errorCode}</p>}
                     {connection.migrationRequired && <div className="rounded bg-amber-50 p-3 text-amber-900"><p>Anonymous-key access is disabled. Use signed push for hosted Supabase; cached history is retained.</p><Button variant="outline" size="sm" onClick={() => { setFormData({ label: connection.label, connectionString: '', caCertificate: '' }); void openSetup(connection.id); }}>Switch to secure connection</Button></div>}
                     {connection.config?.mode==='push' && <Button variant="outline" size="sm" onClick={async()=>{const r=await api.getSupabasePushSetup(connection.id);if(r.success && r.data){setConnectionMode('push');setSetupSql('');setPushInstallSql(r.data.sql);setShowAddForm(true);}else setError(r.error || 'Unable to load sender setup');}}>Sender setup SQL</Button>}
                     {connection.config?.mode==='postgres' && <Button variant="outline" size="sm" onClick={()=>{setFormData({label:connection.label,connectionString:'',caCertificate:''});void openSetup(connection.id);}}>Switch to signed push</Button>}
